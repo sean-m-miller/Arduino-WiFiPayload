@@ -28,7 +28,7 @@ void WiFiPayload::set_device_name(String name){
     }
 }
 
-int WiFiPayload::write(){
+void WiFiPayload::write(){
     // data.root.set<String>("msg_type", "transmission"); //explicit casts for clarity
     // data.root.set<String>("ip", WiFi.localIP().toString());
     // data.root.set<String>("device_name", device_name);
@@ -38,13 +38,9 @@ int WiFiPayload::write(){
     data->add("ip", WiFi.localIP().toString());
     data->add("device_name", device_name);
 
-    time_t timestamp = now();
+    //data->root.set<unsigned long>("timestamp", ts);
 
-    unsigned long ts = (unsigned long)timestamp;
-
-    data->root.set<unsigned long>("timestamp", ts);
-
-    mes_length = data->jsonBuffer.size() // returns number of bytes being used in the array by jsonObjects. 
+    mes_length = data->jsonBuffer.size(); // returns number of bytes being used in the array by jsonObjects. 
     // Set so that write_to_circ has access to it (data object might be destroyed before )
 
     data->root.printTo(mes_buf, 1024); // convert from JSON object to c string
@@ -52,14 +48,17 @@ int WiFiPayload::write(){
     write_to_circ();
 
     //Send a packet -> MOVED TO READ_FROM_CIRC()
-    udp.beginPacket(udpAddress,udpPort);
-    udp.printf(mes_buf);
-    return udp.endPacket(); // 1 or 0
+    // udp.beginPacket(udpAddress,udpPort);
+    // udp.printf(mes_buf);
+    // return udp.endPacket(); // 1 or 0
     // message too big
     //Serial.print("Write Failed: not connected");
 }
 
 void WiFiPayload::write_to_circ(){
+    Serial.print("Before Writing");
+    Serial.print(mes_buf);
+    delay(4000);
     for(size_t i = 0; i < mes_length; i++){
         if((in + 4) % circ_length == out){ // + 4 to accommodate the flag
             return; // what should happen in the event that in catches up with out..?
@@ -71,41 +70,49 @@ void WiFiPayload::write_to_circ(){
     circ_buf[(in + 2) % circ_length] = '^';
     circ_buf[(in + 3) % circ_length] = '_';
     circ_buf[(in + 4) % circ_length] = '^';
-    in = (in + 4) circ_length;
+    in = (in + 5) % circ_length; // incriment in to be one index after end of flag.
 }
 
 int WiFiPayload::read_from_circ(){
-    char temp[1024];
-    size_t index = 0;
-    while(circ_buf[out] != ':' && circ_buf[(out + 1) % circ_length] != '^' && circ_buf[(out + 2) % circ_length] != '_' && circ_buf[(out + 3) % circ_length] != '^'){
-        temp[index] = circ_buf[out];
-        count++;
-        out = (out + 1)%circ_length;
+    while(out != in){
+        char temp[1024];
+        size_t index = 0;
+        while(!((circ_buf[out] == ':') && (circ_buf[(out + 1) % circ_length] == '^') && (circ_buf[(out + 2) % circ_length] == '_') && (circ_buf[(out + 3) % circ_length] == '^'))){
+            temp[index] = circ_buf[out];
+            out = (out + 1) % circ_length;
+            index++;
+        }
+        out = (out + 4) % circ_length;
+        Serial.print("After Reading");
+        Serial.print(temp);
+        delay(4000);
+        udp.beginPacket(udpAddress,udpPort);
+        udp.printf(temp);
+        return udp.endPacket();
     }
-    out = (out + 4) % circ_length;
-    udp.beginPacket(udpAddress,udpPort);
-    udp.printf(temp);
-    return udp.endPacket(); 
 }
 
-void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and send data from circ_buf, send heartbeat every 2 seconds
-
-    if((int)now()%5 == time){
+void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and send data from circ_buf, send heartbeat every 3 seconds
+    int sec = second();
+    if((sec != time) && (sec % 3 == 0)){ // if its not the same second as last heartbeat, and if its 3 seconds after the last heartbeat.
+        time = sec;
         char heart_buf[100];
 
-        StaticJsonBuffer<100> jsonBuffer; // buffer on stack. Use DynamicJsonBuffer for buffer on heap.
-        JsonObject& root = jsonBuffer.createObject(); // initialize root of JSON object. Memory freed when root goes out of scope.
-        root.set<String>("msg_type", "heartbeat");
-        root.set<String>("ip", WiFi.localIP().toString());
+        StaticJsonBuffer<100> tempBuffer; // buffer on stack. Use DynamicJsonBuffer for buffer on heap.
+        JsonObject& temp_root = tempBuffer.createObject(); // initialize root of JSON object. Memory freed when root goes out of scope.
+        temp_root.set<String>("msg_type", "heartbeat");
+        temp_root.set<String>("ip", WiFi.localIP().toString());
 
-        root.printTo(heart_buf, 100);
+        temp_root.printTo(heart_buf, 100);
 
         //Send a packet
+        Serial.print(" HEARTBEAT: ");
+        Serial.print(heart_buf);
         udp.beginPacket(udpAddress, udpPort);
         udp.printf(heart_buf);
         udp.endPacket();
     }
-    
+    read_from_circ();
 }
 
 const char* WiFiPayload::get_networkName(){
@@ -162,5 +169,5 @@ void WiFiPayload::connectToWiFi(){
 
 void WiFiPayload::clear_data(){
     delete data;
-    data = new data;
+    data = new Data;
 }

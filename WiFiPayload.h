@@ -36,7 +36,7 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
 
         const char* get_networkPswd();
 
-        int write();
+        void write();
 
         void run();
 
@@ -45,6 +45,11 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
         static void WiFiEvent(WiFiEvent_t event);
 
         void clear_data();
+
+        void heartbeat();
+
+         Data* data; // this must be a pointer, since the data object contains reference to a jsonObjcet, which cannot be reassigned during clear_data.
+        //Insted, an entirely new Data object must be created.
 
     private:
 
@@ -60,21 +65,16 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
 
         int read_from_circ(); // returns 1 on success, 0 on failure.
 
-        void heartbeat();
+        
 
-        const char * networkName = "bitchass jr.";
-        const char * networkPswd = "watermelon";
-        const char * udpAddress = "10.0.0.176";
+        const char * networkName = "The LAN Down Under";
+        const char * networkPswd = "weedbitch";
+        const char * udpAddress = "192.168.0.18";
         const int udpPort = 12345;
 
         // bool connected = false;
         
         WiFiUDP& udp;
-
-        Data* data; // this must be a pointer, since the data object contains reference to a jsonObjcet, which cannot be reassigned during clear_data.
-        //Insted, an entirely new Data object must be created.
-
-        //WiFiClass& wifi;
 
         char mes_buf[1024]; // max size of message
 
@@ -84,7 +84,7 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
 
         String device_name = "No_Name";
 
-        time_t time = (int)now()%5;
+        int time = -1; // heartbeat immediately (will always pass if statement within 3 seconds)
 };
 
 #endif
