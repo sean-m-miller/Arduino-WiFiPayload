@@ -36,6 +36,18 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
 
         const char* get_networkPswd();
 
+        void create_custom_object(const char*);
+
+        template <typename W> void add_data(const char* key, W w){
+            data->add(key, w);
+        }
+
+        template <typename C> int add_to_custom_object(const char* key, const char* index, C c){
+            data->add_to_custom_object(key, index, c);
+        }
+
+        void remove(const char* key);
+
         void write();
 
         void run();
@@ -44,11 +56,9 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
 
         static void WiFiEvent(WiFiEvent_t event);
 
-        void clear_data();
-
         void heartbeat();
 
-         Data* data; // this must be a pointer, since the data object contains reference to a jsonObjcet, which cannot be reassigned during clear_data.
+        Data* data; // this must be a pointer, since the data object contains reference to a jsonObjet, which cannot be reassigned during clear_data.
         //Insted, an entirely new Data object must be created.
 
     private:
@@ -61,15 +71,15 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
         
         //void WiFiEvent(WiFiEvent_t);
 
+        void clear_data();
+
         void write_to_circ();
 
         int read_from_circ(); // returns 1 on success, 0 on failure.
 
-        
-
-        const char * networkName = "The LAN Down Under";
-        const char * networkPswd = "weedbitch";
-        const char * udpAddress = "192.168.0.18";
+        const char * networkName = "OpenROV";
+        const char * networkPswd = "bilgepump";
+        const char * udpAddress = "192.168.1.86";
         const int udpPort = 12345;
 
         // bool connected = false;

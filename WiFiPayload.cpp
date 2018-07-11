@@ -3,19 +3,9 @@
 
 bool connected = false;
 
-WiFiPayload::WiFiPayload(WiFiUDP& u) : udp(u) {
-
-    data = new Data;
-
-    //connectToWiFi();
-
-    // //attempt to initialize nvs flash memory. From: https://github.com/espressif/esp-idf/blob/master/examples/wifi/simple_wifi/main/simple_wifi.c
-    // esp_err_t ret = nvs_flash_init();
-    // if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
-    //   ESP_ERROR_CHECK(nvs_flash_erase());
-    //   ret = nvs_flash_init();
-    // }
-    // ESP_ERROR_CHECK(ret);
+WiFiPayload::WiFiPayload(WiFiUDP& u) : udp(u){
+    data = new Data;/*new_data;*/
+    data->create_custom_object("data", data->DATAroot);
 }
 
 WiFiPayload::~WiFiPayload(){
@@ -29,30 +19,20 @@ void WiFiPayload::set_device_name(String name){
 }
 
 void WiFiPayload::write(){
-    // data.root.set<String>("msg_type", "transmission"); //explicit casts for clarity
-    // data.root.set<String>("ip", WiFi.localIP().toString());
-    // data.root.set<String>("device_name", device_name);
-     
 
-    data->add("msg_type", "transmission");
-    data->add("ip", WiFi.localIP().toString());
-    data->add("device_name", device_name);
-
+    data->DATAroot["msg_type"] = "transmission";
+    data->DATAroot["ip"] = WiFi.localIP().toString();
+    data->DATAroot["device_name"] = device_name;
+    
     //data->root.set<unsigned long>("timestamp", ts);
 
     mes_length = data->jsonBuffer.size(); // returns number of bytes being used in the array by jsonObjects. 
     // Set so that write_to_circ has access to it (data object might be destroyed before )
 
-    data->root.printTo(mes_buf, 1024); // convert from JSON object to c string
+    data->DATAroot.printTo(mes_buf, 1024); // convert from JSON object to c string
 
     write_to_circ();
-
-    //Send a packet -> MOVED TO READ_FROM_CIRC()
-    // udp.beginPacket(udpAddress,udpPort);
-    // udp.printf(mes_buf);
-    // return udp.endPacket(); // 1 or 0
-    // message too big
-    //Serial.print("Write Failed: not connected");
+    clear_data();
 }
 
 void WiFiPayload::write_to_circ(){
@@ -161,13 +141,15 @@ void WiFiPayload::connectToWiFi(){
     WiFi.begin(networkName, networkPswd); // password must be chars with ASCII values between 32-126 (decimal)
 
     Serial.println("Waiting for WIFI connection...");
-
-    //while(!connected){}
-
-    //udp.begin(WiFi.localIP(),udpPort); // 
 }
 
 void WiFiPayload::clear_data(){
     delete data;
-    data = new Data;
+    data = new Data; // set to address of new_data
+    data->create_custom_object("data", data->DATAroot);
 }
+
+void WiFiPayload::create_custom_object(const char* key){
+    data->create_custom_object(key, data->find_custom_object("data"));
+}
+
