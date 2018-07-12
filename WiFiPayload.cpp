@@ -3,7 +3,8 @@
 
 bool connected = false;
 
-WiFiPayload::WiFiPayload(WiFiUDP& u) : udp(u){
+WiFiPayload::WiFiPayload() : udp(udp), buf(buf){
+    Serial.println("in WiFiPayload constructor");
     data = new Data;/*new_data;*/
     data->create_custom_object("data", data->DATAroot);
 }
@@ -20,7 +21,7 @@ void WiFiPayload::set_device_name(String name){
 
 void WiFiPayload::write(){
 
-    data->DATAroot["msg_type"] = "transmission";
+    data->DATAroot["msg_type"] = "transmission"; // add to root object, not 
     data->DATAroot["ip"] = WiFi.localIP().toString();
     data->DATAroot["device_name"] = device_name;
     
@@ -31,44 +32,25 @@ void WiFiPayload::write(){
 
     data->DATAroot.printTo(mes_buf, 1024); // convert from JSON object to c string
 
-    write_to_circ();
+    write_to_buf();
     clear_data();
 }
 
-void WiFiPayload::write_to_circ(){
-    Serial.print("Before Writing");
-    Serial.print(mes_buf);
-    delay(4000);
-    for(size_t i = 0; i < mes_length; i++){
-        if((in + 4) % circ_length == out){ // + 4 to accommodate the flag
-            return; // what should happen in the event that in catches up with out..?
-        }
-        circ_buf[in] = mes_buf[i];
-        in = (in + 1) % circ_length;
-    }
-    circ_buf[(in + 1) % circ_length] = ':';
-    circ_buf[(in + 2) % circ_length] = '^';
-    circ_buf[(in + 3) % circ_length] = '_';
-    circ_buf[(in + 4) % circ_length] = '^';
-    in = (in + 5) % circ_length; // incriment in to be one index after end of flag.
+void WiFiPayload::write_to_buf(){
+    buf.write_to_circ(mes_buf, mes_length);
 }
 
-int WiFiPayload::read_from_circ(){
-    while(out != in){
-        char temp[1024];
-        size_t index = 0;
-        while(!((circ_buf[out] == ':') && (circ_buf[(out + 1) % circ_length] == '^') && (circ_buf[(out + 2) % circ_length] == '_') && (circ_buf[(out + 3) % circ_length] == '^'))){
-            temp[index] = circ_buf[out];
-            out = (out + 1) % circ_length;
-            index++;
-        }
-        out = (out + 4) % circ_length;
-        Serial.print("After Reading");
-        Serial.print(temp);
-        delay(4000);
+int WiFiPayload::read_from_buf(){
+    char temp[1024];
+    
+    Serial.println(buf._out);
+    Serial.println(buf._in);
+    while(buf._out != buf._in){
+        buf.read_from_circ(temp);
         udp.beginPacket(udpAddress,udpPort);
         udp.printf(temp);
-        return udp.endPacket();
+        udp.endPacket();
+        memset(temp, 0, 1024);
     }
 }
 
@@ -85,14 +67,11 @@ void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and se
 
         temp_root.printTo(heart_buf, 100);
 
-        //Send a packet
-        Serial.print(" HEARTBEAT: ");
-        Serial.print(heart_buf);
-        udp.beginPacket(udpAddress, udpPort);
-        udp.printf(heart_buf);
-        udp.endPacket();
+        //write to circ_buf
+        buf.write_to_circ(heart_buf, 100); // no null characters in this message ever besides the terminating one hopefully
+        delay(10000);
     }
-    read_from_circ();
+    read_from_buf();
 }
 
 const char* WiFiPayload::get_networkName(){
@@ -152,4 +131,3 @@ void WiFiPayload::clear_data(){
 void WiFiPayload::create_custom_object(const char* key){
     data->create_custom_object(key, data->find_custom_object("data"));
 }
-

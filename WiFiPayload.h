@@ -9,9 +9,8 @@
 #include <ArduinoJson.h>
 #include <TimeLib.h>
 #include <Data.h>
+#include <CircBuff.h>
 //#include <nvs_flash.h> not needed anymore
-
-#define circ_length 4096
 
 extern bool connected;
 
@@ -26,7 +25,7 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
 
         //WiFiUDP& udp;
 
-        WiFiPayload(WiFiUDP&);
+        WiFiPayload();
 
         ~WiFiPayload();
 
@@ -63,26 +62,20 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
 
     private:
 
-        char circ_buf[circ_length];
-
-        size_t in = 0;
-
-        size_t out = 0;
+        CircBuff& buf;
         
         //void WiFiEvent(WiFiEvent_t);
 
         void clear_data();
 
-        void write_to_circ();
+        void write_to_buf();
 
-        int read_from_circ(); // returns 1 on success, 0 on failure.
+        int read_from_buf(); // returns 1 on success, 0 on failure.
 
         const char * networkName = "OpenROV";
         const char * networkPswd = "bilgepump";
         const char * udpAddress = "192.168.1.86";
         const int udpPort = 12345;
-
-        // bool connected = false;
         
         WiFiUDP& udp;
 
@@ -90,11 +83,15 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
 
         int mes_length = 0;
 
-        //DynamicJsonBuffer json(max_length);
-
         String device_name = "No_Name";
 
         int time = -1; // heartbeat immediately (will always pass if statement within 3 seconds)
 };
+
+extern WiFiClass WiFi;
+
+extern WiFiUDP udp;
+
+extern CircBuff buf;
 
 #endif
