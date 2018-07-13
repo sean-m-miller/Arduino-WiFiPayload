@@ -1,5 +1,3 @@
-// make zip file including these files, WiFi.h (WiFiUdp included..?) and ArduinoJson.h libraries
-
 #ifndef WiFiPayload_h
 #define WiFiPayload_h
 
@@ -10,20 +8,12 @@
 #include <TimeLib.h>
 #include <Data.h>
 #include <CircBuff.h>
-//#include <nvs_flash.h> not needed anymore
 
 extern bool connected;
 
-//const char * udpAddress = "192.1.168.86";
-
-//const int udpPort = 12345;
-
-//class Data;
-
-class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
+class WiFiPayload {
+    
     public:
-
-        //WiFiUDP& udp;
 
         WiFiPayload();
 
@@ -35,21 +25,23 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
 
         const char* get_networkPswd();
 
-        void create_custom_object(const char*);
-
         template <typename W> void add_data(const char* key, W w){
             data->add(key, w);
         }
+
+        void create_custom_object(const char* key);
 
         template <typename C> int add_to_custom_object(const char* key, const char* index, C c){
             data->add_to_custom_object(key, index, c);
         }
 
+        void create_array(const char* key);
+
         void remove(const char* key);
 
         void write();
 
-        void run();
+        size_t get_capacity();
 
         void connectToWiFi();
 
@@ -60,9 +52,11 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
         Data* data; // this must be a pointer, since the data object contains reference to a jsonObjet, which cannot be reassigned during clear_data.
         //Insted, an entirely new Data object must be created.
 
+        CircBuff buf;
+
     private:
 
-        CircBuff& buf;
+        
         
         //void WiFiEvent(WiFiEvent_t);
 
@@ -77,7 +71,7 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
         const char * udpAddress = "192.168.1.86";
         const int udpPort = 12345;
         
-        WiFiUDP& udp;
+        WiFiUDP udp;
 
         char mes_buf[1024]; // max size of message
 
@@ -88,10 +82,10 @@ class WiFiPayload /*: WiFiClass*/ /*WiFiUDP*/ {
         int time = -1; // heartbeat immediately (will always pass if statement within 3 seconds)
 };
 
-extern WiFiClass WiFi;
+// extern WiFiClass WiFi; // ensures construction before other extern WiFi
 
-extern WiFiUDP udp;
+//extern WiFiUDP udp;
 
-extern CircBuff buf;
+//extern CircBuff buf;
 
 #endif

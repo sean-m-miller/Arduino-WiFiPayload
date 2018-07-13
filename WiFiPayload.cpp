@@ -3,8 +3,10 @@
 
 bool connected = false;
 
-WiFiPayload::WiFiPayload() : udp(udp), buf(buf){
-    Serial.println("in WiFiPayload constructor");
+WiFiUDP udp;
+
+WiFiPayload::WiFiPayload(){
+    //Serial.println("in WiFiPayload constructor");
     data = new Data;/*new_data;*/
     data->create_custom_object("data", data->DATAroot);
 }
@@ -37,40 +39,30 @@ void WiFiPayload::write(){
 }
 
 void WiFiPayload::write_to_buf(){
-    buf.write_to_circ(mes_buf, mes_length);
+    buf.write(mes_buf, mes_length);
 }
 
 int WiFiPayload::read_from_buf(){
-    char temp[1024];
-    
-    Serial.println(buf._out);
-    Serial.println(buf._in);
-    while(buf._out != buf._in){
-        buf.read_from_circ(temp);
-        udp.beginPacket(udpAddress,udpPort);
-        udp.printf(temp);
-        udp.endPacket();
-        memset(temp, 0, 1024);
-    }
+    buf.read(udp, udpAddress, udpPort);
 }
 
 void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and send data from circ_buf, send heartbeat every 3 seconds
-    int sec = second();
-    if((sec != time) && (sec % 3 == 0)){ // if its not the same second as last heartbeat, and if its 3 seconds after the last heartbeat.
-        time = sec;
-        char heart_buf[100];
+    // int sec = second();
+    // if((sec != time) && (sec % 3 == 0)){ // if its not the same second as last heartbeat, and if its 3 seconds after the last heartbeat.
+        //time = sec;
+        char heart_buf[68]; // largest possible heartbeat message: 192.168.1.143 used 66 bytes, if ip in form WWW.XXX.YYY.ZZZ, would use two more bytes. 
 
-        StaticJsonBuffer<100> tempBuffer; // buffer on stack. Use DynamicJsonBuffer for buffer on heap.
+        StaticJsonBuffer<68> tempBuffer; // buffer on stack. Use DynamicJsonBuffer for buffer on heap.
         JsonObject& temp_root = tempBuffer.createObject(); // initialize root of JSON object. Memory freed when root goes out of scope.
         temp_root.set<String>("msg_type", "heartbeat");
         temp_root.set<String>("ip", WiFi.localIP().toString());
 
-        temp_root.printTo(heart_buf, 100);
+        temp_root.printTo(heart_buf, 68);
 
         //write to circ_buf
-        buf.write_to_circ(heart_buf, 100); // no null characters in this message ever besides the terminating one hopefully
-        delay(10000);
-    }
+        buf.write(heart_buf, 68); // no null characters in this message ever besides the terminating one hopefully
+        //delay(10000);
+    // }
     read_from_buf();
 }
 
@@ -130,4 +122,12 @@ void WiFiPayload::clear_data(){
 
 void WiFiPayload::create_custom_object(const char* key){
     data->create_custom_object(key, data->find_custom_object("data"));
+}
+
+void WiFiPayload::create_array(const char* key){
+    data->create_array(key, data->find_custom_object("data"));
+}
+
+size_t WiFiPayload::get_capacity(){
+    return data->jsonBuffer.size();
 }
