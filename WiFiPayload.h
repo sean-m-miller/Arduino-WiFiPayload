@@ -29,10 +29,14 @@ class WiFiPayload {
             data->add(key, w);
         }
 
-        void create_custom_object(const char* key);
+        void create_object(const char* key_);
 
-        template <typename C> int add_to_custom_object(const char* key, const char* index, C c){
-            data->add_to_custom_object(key, index, c);
+        template <typename C> int add_to_object(const char* key, const char* index, C c){
+            data->add_to_object(key, index, c);
+        }
+
+        template <typename C> int add_to_array(const char* key, size_t index, C c){
+            data->add_to_array(key, index, c);
         }
 
         void create_array(const char* key);
@@ -56,8 +60,6 @@ class WiFiPayload {
 
     private:
 
-        
-        
         //void WiFiEvent(WiFiEvent_t);
 
         void clear_data();

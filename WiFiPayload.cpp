@@ -8,7 +8,8 @@ WiFiUDP udp;
 WiFiPayload::WiFiPayload(){
     //Serial.println("in WiFiPayload constructor");
     data = new Data;/*new_data;*/
-    data->create_custom_object("data", data->DATAroot);
+    
+    data->create_object("data", data->DATAroot);
 }
 
 WiFiPayload::~WiFiPayload(){
@@ -117,16 +118,26 @@ void WiFiPayload::connectToWiFi(){
 void WiFiPayload::clear_data(){
     delete data;
     data = new Data; // set to address of new_data
-    data->create_custom_object("data", data->DATAroot);
+    data->create_object("data", data->DATAroot);
 }
 
-void WiFiPayload::create_custom_object(const char* key){
-    data->create_custom_object(key, data->find_custom_object("data"));
+void WiFiPayload::create_object(const char* key_){
+    data->create_object(key_, data->find_custom("data")->get_field());
 }
 
-void WiFiPayload::create_array(const char* key){
-    data->create_array(key, data->find_custom_object("data"));
+void WiFiPayload::create_array(const char* key_){
+    data->create_array(key_, data->find_custom("data")->get_field());
 }
+
+// size_t WiFiPayload::nest_array(const char* outer, const char* inner){ 
+//     if(Node* out = data->find_custom(outer)){ 
+//         if(Node* in = data->find_custom(inner)){ //nest a pre-existing 
+
+//         }
+//     }
+// }
+
+// size_t WiFiPayload::nest_object(const char* outer, const char* inner){}
 
 size_t WiFiPayload::get_capacity(){
     return data->jsonBuffer.size();
