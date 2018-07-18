@@ -6,7 +6,8 @@
 #include <WiFiUdp.h>
 #include <ArduinoJson.h>
 #include <TimeLib.h>
-#include <Data.h>
+#include <Outgoing_Data.h>
+#include <Incoming_Data.h>
 #include <CircBuff.h>
 
 extern bool connected;
@@ -25,52 +26,79 @@ class WiFiPayload {
 
         const char* get_networkPswd();
 
-        template <typename W> void add_data(const char* key, W w){
-            data->add(key, w);
-        }
+        Outgoing_Data& get_out_msg();
 
-        void create_object(const char* key_);
+        Incoming_Data& get_in_msg();
 
-        template <typename C> int add_to_object(const char* key, const char* index, C c){
-            data->add_to_object(key, index, c);
-        }
+        // template <typename W> void add_data_out_msg(const char* key_, W w){
+        //     out_data.add(key_, w);
+        // }
 
-        template <typename C> int add_to_array(const char* key, size_t index, C c){
-            data->add_to_array(key, index, c);
-        }
+        // template <typename W> void add_data_in_msg(const char* key_, W w){
+        //     in_data.add(key_, w);
+        // }
 
-        void create_array(const char* key);
+        // void create_object_out_msg(const char* key_);
 
-        size_t create_nested_array(const char* key_, const char* arr_key);
+        // void create_object_in_msg(const char* key_);
 
-        size_t create_nested_object(const char* key_, const char* obj_key);
+        // void create_array_out_msg(const char* key_);
 
-        size_t write();
+        // void create_array_in_msg(const char* key_);
+
+        // template <typename C> int add_to_object_out_msg(const char* key_, const char* index, C c){
+        //     out_data.add_to_object(key_, index, c);
+        // }
+
+        // template <typename C> int add_to_object_in_msg(const char* key_, const char* index, C c){
+        //     in_data.add_to_object(key_, index, c);
+        // }
+
+        // template <typename C> int add_to_array_out_msg(const char* key_, size_t index, C c){
+        //     out_data.add_to_array(key_, index, c);
+        // }
+
+        // template <typename C> int add_to_array_in_msg(const char* key_, size_t index, C c){
+        //     in_data.add_to_array(key_, index, c);
+        // }
+
+        // size_t create_nested_array_out_msg(const char* key_, const char* arr_key);
+
+        // size_t create_nested_array_in_msg(const char* key_, const char* arr_key);
+
+        // size_t create_nested_object_out_msg(const char* key_, const char* obj_key);
+
+        // size_t create_nested_object_in_msg(const char* key_, const char* obj_key);
+
+        size_t write_out_msg();
 
         size_t read();
 
-        size_t get_capacity();
+        size_t write_in_msg();
+
+        // size_t get_capacity_out_msg();
+
+        // size_t get_capacity_in_msg();
 
         void connectToWiFi();
 
-        static void WiFiEvent(WiFiEvent_t event);
-
         void heartbeat();
-
-        Data* data; // this must be a pointer, since the data object contains reference to a jsonObjet, which cannot be reassigned during clear_data.
-        //Insted, an entirely new Data object must be created.
-
-        CircBuff buf;
-
-        CircBuff read_buf;
-
-        char read_mes_buf[1024];
 
     private:
 
-        //void WiFiEvent(WiFiEvent_t);
+        static void WiFiEvent(WiFiEvent_t event);
 
-        void clear_data();
+        Outgoing_Data out_data;
+
+        Incoming_Data in_data;
+
+        CircBuff write_buf;
+
+        CircBuff read_buf;
+
+        void clear_out_data();
+
+        void clear_in_data();
 
         void write_to_buf();
 
@@ -85,7 +113,9 @@ class WiFiPayload {
         
         WiFiUDP udp;
 
-        char mes_buf[1024]; // max size of message
+        char write_mes_buf[1024]; // max size of message
+
+        char read_mes_buf[1024];
 
         int mes_length = 0;
 
@@ -93,11 +123,5 @@ class WiFiPayload {
 
         int time = -1; // heartbeat immediately (will always pass if statement within 3 seconds)
 };
-
-// extern WiFiClass WiFi; // ensures construction before other extern WiFi
-
-//extern WiFiUDP udp;
-
-//extern CircBuff buf;
 
 #endif
