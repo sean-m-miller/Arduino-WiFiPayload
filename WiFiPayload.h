@@ -41,9 +41,13 @@ class WiFiPayload {
 
         void create_array(const char* key);
 
-        void remove(const char* key);
+        size_t create_nested_array(const char* key_, const char* arr_key);
 
-        void write();
+        size_t create_nested_object(const char* key_, const char* obj_key);
+
+        size_t write();
+
+        size_t read();
 
         size_t get_capacity();
 
@@ -58,6 +62,10 @@ class WiFiPayload {
 
         CircBuff buf;
 
+        CircBuff read_buf;
+
+        char read_mes_buf[1024];
+
     private:
 
         //void WiFiEvent(WiFiEvent_t);
@@ -68,10 +76,12 @@ class WiFiPayload {
 
         int read_from_buf(); // returns 1 on success, 0 on failure.
 
-        const char * networkName = "OpenROV";
-        const char * networkPswd = "bilgepump";
-        const char * udpAddress = "192.168.1.86";
-        const int udpPort = 12345;
+        int read_into_buf();
+
+        const char * networkName = "bitchass jr.";
+        const char * networkPswd = "watermelon";
+        const char * udpAddress = "10.0.0.176";
+        const unsigned int udpPort = 12345;
         
         WiFiUDP udp;
 
