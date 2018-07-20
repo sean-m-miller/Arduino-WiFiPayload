@@ -22,53 +22,9 @@ class WiFiPayload {
 
         void set_device_name(String);
 
-        const char* get_networkName();
-
-        const char* get_networkPswd();
-
         Outgoing_Data& get_out_msg();
 
         Incoming_Data& get_in_msg();
-
-        // template <typename W> void add_data_out_msg(const char* key_, W w){
-        //     out_data.add(key_, w);
-        // }
-
-        // template <typename W> void add_data_in_msg(const char* key_, W w){
-        //     in_data.add(key_, w);
-        // }
-
-        // void create_object_out_msg(const char* key_);
-
-        // void create_object_in_msg(const char* key_);
-
-        // void create_array_out_msg(const char* key_);
-
-        // void create_array_in_msg(const char* key_);
-
-        // template <typename C> int add_to_object_out_msg(const char* key_, const char* index, C c){
-        //     out_data.add_to_object(key_, index, c);
-        // }
-
-        // template <typename C> int add_to_object_in_msg(const char* key_, const char* index, C c){
-        //     in_data.add_to_object(key_, index, c);
-        // }
-
-        // template <typename C> int add_to_array_out_msg(const char* key_, size_t index, C c){
-        //     out_data.add_to_array(key_, index, c);
-        // }
-
-        // template <typename C> int add_to_array_in_msg(const char* key_, size_t index, C c){
-        //     in_data.add_to_array(key_, index, c);
-        // }
-
-        // size_t create_nested_array_out_msg(const char* key_, const char* arr_key);
-
-        // size_t create_nested_array_in_msg(const char* key_, const char* arr_key);
-
-        // size_t create_nested_object_out_msg(const char* key_, const char* obj_key);
-
-        // size_t create_nested_object_in_msg(const char* key_, const char* obj_key);
 
         size_t write_out_msg();
 
@@ -76,15 +32,13 @@ class WiFiPayload {
 
         size_t write_in_msg();
 
-        // size_t get_capacity_out_msg();
-
-        // size_t get_capacity_in_msg();
-
         void connectToWiFi();
 
         void heartbeat();
 
     private:
+
+        bool ready = false;
 
         static void WiFiEvent(WiFiEvent_t event);
 
@@ -96,19 +50,14 @@ class WiFiPayload {
 
         CircBuff read_buf;
 
-        void clear_out_data();
-
-        void clear_in_data();
-
-        void write_to_buf();
-
-        int read_from_buf(); // returns 1 on success, 0 on failure.
-
         int read_into_buf();
 
-        const char * networkName = "bitchass jr.";
-        const char * networkPswd = "watermelon";
-        const char * udpAddress = "10.0.0.176";
+        const char* networkName = "OpenROV";
+
+        const char* networkPswd = "bilgepump";
+
+        const char * udpAddress = "192.168.1.86";
+
         const unsigned int udpPort = 12345;
         
         WiFiUDP udp;

@@ -5,9 +5,7 @@ bool connected = false;
 
 //WiFiUDP udp;
 
-WiFiPayload::WiFiPayload(){
-    out_data.create_object("data", out_data.DATAroot);
-}
+WiFiPayload::WiFiPayload(){}
 
 WiFiPayload::~WiFiPayload(){}
 
@@ -18,11 +16,16 @@ void WiFiPayload::set_device_name(String name){
 }
 
 Outgoing_Data& WiFiPayload::get_out_msg(){
+    // setup out_data for editing and return.
+    out_data.create_object("data", out_data.DATAroot);
     return out_data;
 }
 
 Incoming_Data& WiFiPayload::get_in_msg(){
-    return in_data;
+    if(ready){ // if a message has been construced into the in_data object
+        return in_data;
+        ready = false; // cannot read another message till in_data gets clear()ed
+    }
 }
 
 size_t WiFiPayload::write_out_msg(){
@@ -31,9 +34,9 @@ size_t WiFiPayload::write_out_msg(){
         return 0;
     }
 
-    out_data.add_data("msg_type", "transmission"); // add to root object, not 
-    out_data.add_data("ip", WiFi.localIP().toString());
-    out_data.add_data("device_name", device_name);
+    out_data.DATAroot["msg_type"] = "transmission"; // add to root object, not 
+    out_data.DATAroot["ip"] = WiFi.localIP().toString();
+    out_data.DATAroot["device_name"] = device_name;
     
     //data->root.set<unsigned long>("timestamp", ts);
 
@@ -42,15 +45,13 @@ size_t WiFiPayload::write_out_msg(){
 
     out_data.DATAroot.printTo(write_mes_buf, mes_length); // convert from JSON object to c string
 
-    write_to_buf();
-    clear_out_data();
+    write_buf.write(write_mes_buf, mes_length);
+    out_data.clear();
+    out_data.create_object("data", out_data.DATAroot);
     return 1;
 }
 
 size_t WiFiPayload::write_in_msg(){
-    if(device_name=="no_name"){
-        return 0;
-    }
 
     in_data.add_data("msg_type", "transmission"); // add to root object, not 
     in_data.add_data("ip", WiFi.localIP().toString());
@@ -63,17 +64,10 @@ size_t WiFiPayload::write_in_msg(){
 
     in_data.DATAroot.printTo(write_mes_buf, mes_length); // convert from JSON object to c string
 
-    write_to_buf();
-    clear_in_data();
-    return 1;
-}
-
-void WiFiPayload::write_to_buf(){
     write_buf.write(write_mes_buf, mes_length);
-}
-
-int WiFiPayload::read_from_buf(){
-    write_buf.read(udp, udpAddress, udpPort);
+    in_data.clear();
+    
+    return 1;
 }
 
 int WiFiPayload::read_into_buf(){ // if a packet has been recieved, write it into read_buf
@@ -100,9 +94,11 @@ int WiFiPayload::read_into_buf(){ // if a packet has been recieved, write it int
 size_t WiFiPayload::read(){ // return size of first message in read_buf, and load into read_mes_buf
     read_buf.extract_message(read_mes_buf);
 
-    in_data.DATAroot = in_data.jsonBuffer.parseObject(read_mes_buf);
+    in_data.DATAroot = in_data.jsonBuffer->parseObject(read_mes_buf);
 
-    in_data->create_obj_map(in_data.DATAroot.as<JsonObject&>());
+    in_data.create_obj_map(in_data.DATAroot.as<JsonObject&>());
+
+    ready = true; // allow user to get in_data object
 
     // Serial.println("below are new_obj_map_results");
 
@@ -119,31 +115,23 @@ void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and se
     // int sec = second();
     // if((sec != time) && (sec % 3 == 0)){ // if its not the same second as last heartbeat, and if its 3 seconds after the last heartbeat.
         //time = sec;
-        char heart_buf[100]; // largest possible heartbeat message: 192.168.1.143 used 66 bytes, if ip in form WWW.XXX.YYY.ZZZ, would use two more bytes. 
+    char heart_buf[100]; // largest possible heartbeat message: 192.168.1.143 used 66 bytes, if ip in form WWW.XXX.YYY.ZZZ, would use two more bytes. 
 
-        StaticJsonBuffer<100> tempBuffer; // buffer on stack. Use DynamicJsonBuffer for buffer on heap.
-        JsonObject& temp_root = tempBuffer.createObject(); // initialize root of JSON object. Memory freed when root goes out of scope.
-        temp_root.set<String>("msg_type", "heartbeat");
-        temp_root.set<String>("ip", WiFi.localIP().toString());
-        temp_root.set<String>("device_name", device_name);
+    StaticJsonBuffer<100> tempBuffer; // buffer on stack. Use DynamicJsonBuffer for buffer on heap.
+    JsonObject& temp_root = tempBuffer.createObject(); // initialize root of JSON object. Memory freed when root goes out of scope.
+    temp_root.set<String>("msg_type", "heartbeat");
+    temp_root.set<String>("ip", WiFi.localIP().toString());
+    temp_root.set<String>("device_name", device_name);
 
-        temp_root.printTo(heart_buf, 100);
+    temp_root.printTo(heart_buf, 100);
 
-        //write to circ_buf
-        write_buf.write(heart_buf, 100); // no null characters in this message ever besides the terminating one hopefully
+    //write to circ_buf
+    write_buf.write(heart_buf, 100); // no null characters in this message ever besides the terminating one hopefully
         //delay(10000);
     // }
-    read_from_buf();
+    write_buf.read(udp, udpAddress, udpPort);
 
     read_into_buf();
-}
-
-const char* WiFiPayload::get_networkName(){
-    return networkName;
-}
-
-const char* WiFiPayload::get_networkPswd(){
-    return networkPswd;
 }
 
 //wifi event handler
@@ -186,41 +174,3 @@ void WiFiPayload::connectToWiFi(){
 
     Serial.println("Waiting for WIFI connection...");
 }
-
-void WiFiPayload::clear_out_data(){
-    out_data.clear();
-}
-
-void WiFiPayload::clear_in_data(){
-    in_data.clear();
-}
-
-// void WiFiPayload::create_object(const char* key_){
-//     data->create_object(key_, data->find_custom("data")->get_field());
-// }
-
-// void WiFiPayload::create_array(const char* key_){
-//     data->create_array(key_, data->find_custom("data")->get_field());
-// }
-
-// size_t WiFiPayload::create_nested_array(const char* key_, const char* arr_key){
-//     data->create_nested_array(key_, arr_key);
-// }
-
-// size_t WiFiPayload::create_nested_object(const char* key_, const char* obj_key){
-//     data->create_nested_object(key_, obj_key);
-// }
-
-// size_t WiFiPayload::nest_array(const char* outer, const char* inner){ 
-//     if(Node* out = data->find_custom(outer)){ 
-//         if(Node* in = data->find_custom(inner)){ //nest a pre-existing 
-
-//         }
-//     }
-// }
-
-// size_t WiFiPayload::nest_object(const char* outer, const char* inner){}
-
-// size_t WiFiPayload::get_capacity(){
-//     return data->jsonBuffer.size();
-// }
