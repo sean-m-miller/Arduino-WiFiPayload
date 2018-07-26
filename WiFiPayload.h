@@ -12,6 +12,10 @@
 
 extern bool connected;
 
+class Data; // used for Node* in parse()
+
+class Node; // used for Node* in parse()
+
 class WiFiPayload {
     
     public:
@@ -26,11 +30,47 @@ class WiFiPayload {
 
         Incoming_Data& get_in_msg();
 
-        size_t write_out_msg();
+        size_t write();
 
         size_t read();
 
-        size_t write_in_msg();
+        template<typename T> size_t parse(const char* key_, T& destination){
+            if(ready){ // a message has been read and in_data has it parsed.
+                destination = in_data.DATAroot[key_];
+                return 1; // success
+            }
+            return 0;
+        }
+
+        template<typename T> size_t parse(const char* key_, const char* index, T& destination){
+            if(ready){ // a message has been read and in_data has it parsed.
+                Node* it = in_data.find_custom(key_);
+                if(it->var.is<JsonObject>()){
+                    destination = it->obj[index];
+                    return 1; // success
+                }
+            }
+            return 0;
+        }
+
+        template<typename T> size_t parse(const char* key_, size_t index, T& destination){
+            if(ready){ // a message has been read and in_data has it parsed.
+                Node* it = in_data.find_custom(key_);
+                if(it->var.is<JsonArray>()){
+                    destination = it->obj[index];
+                    return 1; // success
+                }
+            }
+            return 0;
+        }
+
+        size_t parse_string(const char* key_, char* destination); // overload for basic field
+
+        size_t parse_string(const char* key_, const char* index, char* destination); // overload for custom object
+
+        size_t parse_string(const char* key_, size_t index, char* destination); // overload for custom array
+
+        //size_t write_in_msg();
 
         void connectToWiFi();
 
@@ -38,13 +78,13 @@ class WiFiPayload {
 
     private:
 
-        bool ready = false;
-
-        static void WiFiEvent(WiFiEvent_t event);
-
         Outgoing_Data out_data;
 
         Incoming_Data in_data;
+
+        bool ready = false;
+
+        static void WiFiEvent(WiFiEvent_t event);
 
         CircBuff write_buf;
 
@@ -72,5 +112,7 @@ class WiFiPayload {
 
         int time = -1; // heartbeat immediately (will always pass if statement within 3 seconds)
 };
+
+
 
 #endif
