@@ -9,29 +9,39 @@ WiFiPayload::WiFiPayload(){}
 
 WiFiPayload::~WiFiPayload(){}
 
-void WiFiPayload::set_device_name(String name){
-    if(name.length() < 25){ //arbitrary max length for device name
-        device_name = name;
+void WiFiPayload::set_device_name(const char* name){
+    if(strlen(name) < 25){ //arbitrary max length for device name
+        strcpy(device_name, name);
     }
 }
 
-Outgoing_Data& WiFiPayload::get_out_msg(){
-    // setup out_data for editing and return.
-    out_data.create_object("data", out_data.DATAroot);
-    return out_data;
+void WiFiPayload::print_out_data_to(char* destination, size_t size){
+    out_data.print_to(destination, size);
 }
 
-Incoming_Data& WiFiPayload::get_in_msg(){
-    if(ready){ // if a message has been construced into the in_data object
-        ready = false;
-        return in_data;
-         // cannot read another message till in_data gets clear()ed
-    }
+void WiFiPayload::print_in_data_to(char* destination, size_t size){
+    in_data.print_to(destination, size);
+}
+
+size_t WiFiPayload::add_array(const char* key_){
+    return out_data.add_array(key_);
+}
+
+size_t WiFiPayload::add_object(const char* key_){
+    return out_data.add_object(key_);
+}
+
+size_t WiFiPayload::create_nested_array(const char* key_, const char* arr_key){
+    return out_data.create_nested_array(key_, arr_key);
+}
+
+size_t WiFiPayload::create_nested_object(const char* key_, const char* obj_key){
+    return out_data.create_nested_object(key_, obj_key);
 }
 
 size_t WiFiPayload::write(){
 
-    if(device_name=="no_name"){
+    if(!strcmp(device_name, "no_name")){
         return 0;
     }
 
@@ -48,18 +58,21 @@ size_t WiFiPayload::write(){
 
     write_buf.write(write_mes_buf, mes_length);
     out_data.clear();
+    out_data.DATAroot = out_data.jsonBuffer.createObject();
+    if(!out_data.DATAroot.success()){
+        Serial.println("Outgoing_constructor failed, JsonObject not created out of jsonBuffer");
+        return 0;
+    }
     out_data.create_object("data", out_data.DATAroot); // have this call here since clearing an Incoming message should not add a data object after resetting hash table.
     return 1;
 }
 
-
-
 int WiFiPayload::read_into_buf(){ // if a packet has been recieved, write it into read_buf
     int packetSize = udp.parsePacket();
     size_t count = 0;
-    Serial.println("packetsize");
-    Serial.println(packetSize);
     if (packetSize){
+        Serial.println("packetsize isssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss:");
+        Serial.println(packetSize);
         if(read_buf.checkCapacity(packetSize)){
             read_buf.start_msg();        
             for(size_t i = 0; i < packetSize; i++){
@@ -75,49 +88,48 @@ int WiFiPayload::read_into_buf(){ // if a packet has been recieved, write it int
     return count;   
 }
 
-size_t WiFiPayload::read(){ // return size of first message in read_buf, and load into read_mes_buf
-    read_buf.extract_message(read_mes_buf);
+size_t WiFiPayload::read(){ // clears current read message. return size of first message in read_buf, and load into read_mes_buf
+
+    //memset(read_mes_buf, '/0', MESSAGE_SIZE);
+
+    in_data.clear(); // with this setup, in_data gets cleared even if no hash table exists. Make clear() virtual, with the Incoming_Data version only clearing if ready = true, and flipping ready to false after. 
+    
+    Serial.println("VALUE OF extract_message()");
+        
+    size_t y = read_buf.extract_message(read_mes_buf);
+
+    Serial.println(y);
 
     in_data.DATAroot = in_data.jsonBuffer.parseObject(read_mes_buf);
 
-    in_data.create_obj_map(in_data.DATAroot.as<JsonObject&>());
+    Serial.println("before create obj map line 101");
 
-    ready = true; // allow user to get in_data object
+    int x = in_data.DATAroot["data"]["b"];
+    Serial.println(x);
 
-    return 1;
-}
-
-size_t WiFiPayload::parse_string(const char* key_, size_t index, char* destination){
-    if(ready){ // a message has been read and in_data has it parsed.
-        Node* it = in_data.find_custom(key_);
-        if(it->var.is<JsonArray>()){
-            strcpy(destination, it->obj[index]);
-            return 1; // success
+    if(in_data.DATAroot.success()){ // checks for valid JSON
+        x = in_data.DATAroot["data"]["b"];
+        Serial.println(x);
+        in_data.create_obj_map(in_data.DATAroot);
+        x = in_data.DATAroot["data"]["b"];
+        Serial.println(x);
+        if(in_data.DATAroot.success()){
+            return 1;
         }
     }
     return 0;
 }
 
-size_t WiFiPayload::parse_string(const char* key_, size_t index, char* destination){
-    if(ready){ // a message has been read and in_data has it parsed.
-        Node* it = in_data.find_custom(key_);
-        if(it->var.is<JsonArray>()){
-            strcpy(destination, it->obj[index]);
-            return 1; // success
-        }
-    }
-    return 0;
+size_t WiFiPayload::parse_array_string(const char* key_, size_t index, char* destination){ // custom array overload
+    return in_data.parse_array_string(key_, index, destination);
 }
 
-size_t WiFiPayload::parse_string(const char* key_, size_t index, char* destination){
-    if(ready){ // a message has been read and in_data has it parsed.
-        Node* it = in_data.find_custom(key_);
-        if(it->var.is<JsonArray>()){
-            strcpy(destination, it->obj[index]);
-            return 1; // success
-        }
-    }
-    return 0;
+size_t WiFiPayload::parse_object_string(const char* key_, const char* index, char* destination){ // custom object overload
+    return in_data.parse_object_string(key_, index, destination);
+}
+
+size_t WiFiPayload::parse_data_string(const char* key_, char* destination){ // data field overload
+    return in_data.parse_data_string(key_, destination);
 }
 
 void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and send data from circ_buf, send heartbeat every 3 seconds

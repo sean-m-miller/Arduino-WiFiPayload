@@ -12,9 +12,7 @@
 
 extern bool connected;
 
-class Data; // used for Node* in parse()
-
-class Node; // used for Node* in parse()
+#define MESSAGE_SIZE 1024
 
 class WiFiPayload {
     
@@ -24,57 +22,59 @@ class WiFiPayload {
 
         ~WiFiPayload();
 
-        void set_device_name(String);
+        void set_device_name(const char* name);
 
-        Outgoing_Data& get_out_msg();
+        template<typename T> size_t add_data(const char* key_, T t){ // relies on implicit casts, overwrites if index already exists
+            return out_data.add_data(key_, t);
+        };
 
-        Incoming_Data& get_in_msg();
+        size_t add_object(const char* key_); // wrapper around create_object
+
+        size_t add_array(const char* key_); // wrapper around create_array
+
+        size_t create_nested_array(const char* key_, const char* arr_key);
+
+        size_t create_nested_object(const char* key_, const char* obj_key);
+
+        //custom_object overload
+        template<typename T> int add_to_object(const char* key_, const char* index, T t){ // add data to either custom_array or custom_object
+            return out_data.add_to_object(key_, index, t);
+        }
+
+        //custom_array overload
+        template<typename T> int add_to_array(const char* key_, size_t index, T t){ // add data to either custom_array or custom_object
+            return out_data.add_to_array(key_, index, t); //key not found or function was called on object
+        }
 
         size_t write();
 
+        template<typename T> size_t parse_data(const char* key_, T& destination){
+            return in_data.parse_data(key_, destination);
+        }
+
+        template<typename T> size_t parse_object(const char* key_, const char* index, T& destination){
+            return in_data.parse_object(key_, index, destination);
+        }
+
+        template<typename T> size_t parse_array(const char* key_, size_t index, T& destination){
+            return in_data.parse_array(key_, index, destination);
+        }
+
+        size_t parse_data_string(const char* key_, char* destination); // overload for basic field
+
+        size_t parse_object_string(const char* key_, const char* index, char* destination); // overload for custom object
+
+        size_t parse_array_string(const char* key_, size_t index, char* destination); // overload for custom array
+
         size_t read();
-
-        template<typename T> size_t parse(const char* key_, T& destination){
-            if(ready){ // a message has been read and in_data has it parsed.
-                destination = in_data.DATAroot[key_];
-                return 1; // success
-            }
-            return 0;
-        }
-
-        template<typename T> size_t parse(const char* key_, const char* index, T& destination){
-            if(ready){ // a message has been read and in_data has it parsed.
-                Node* it = in_data.find_custom(key_);
-                if(it->var.is<JsonObject>()){
-                    destination = it->obj[index];
-                    return 1; // success
-                }
-            }
-            return 0;
-        }
-
-        template<typename T> size_t parse(const char* key_, size_t index, T& destination){
-            if(ready){ // a message has been read and in_data has it parsed.
-                Node* it = in_data.find_custom(key_);
-                if(it->var.is<JsonArray>()){
-                    destination = it->obj[index];
-                    return 1; // success
-                }
-            }
-            return 0;
-        }
-
-        size_t parse_string(const char* key_, char* destination); // overload for basic field
-
-        size_t parse_string(const char* key_, const char* index, char* destination); // overload for custom object
-
-        size_t parse_string(const char* key_, size_t index, char* destination); // overload for custom array
-
-        //size_t write_in_msg();
 
         void connectToWiFi();
 
         void heartbeat();
+
+        void print_out_data_to(char* destination, size_t size);
+
+        void print_in_data_to(char* destination, size_t size);
 
     private:
 
@@ -102,13 +102,13 @@ class WiFiPayload {
         
         WiFiUDP udp;
 
-        char write_mes_buf[1024]; // max size of message
+        char write_mes_buf[MESSAGE_SIZE]; // max size of message
 
-        char read_mes_buf[1024];
+        char read_mes_buf[MESSAGE_SIZE];
 
         int mes_length = 0;
 
-        String device_name = "No_Name";
+        char device_name[25] = "No_Name";
 
         int time = -1; // heartbeat immediately (will always pass if statement within 3 seconds)
 };
