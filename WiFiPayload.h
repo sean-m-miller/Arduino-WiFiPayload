@@ -8,9 +8,12 @@
 #include <TimeLib.h>
 #include <Outgoing_Data.h>
 #include <Incoming_Data.h>
-#include <CircBuff.h>
+#include <OutBuff.h>
+#include <InBuff.h>
 
-extern bool connected;
+#include <FastCRC.h> // https://github.com/FrankBoesing/FastCRC
+
+//extern bool connected;
 
 #define MESSAGE_SIZE 1024
 
@@ -21,6 +24,10 @@ class WiFiPayload {
         WiFiPayload();
 
         ~WiFiPayload();
+
+        void begin(); // set pointers to the externed WiFi and Udp objects.
+
+        bool is_connected();
 
         void set_device_name(const char* name);
 
@@ -82,13 +89,15 @@ class WiFiPayload {
 
         Incoming_Data in_data;
 
+        bool connected = false;
+
         bool ready = false;
 
         static void WiFiEvent(WiFiEvent_t event);
 
-        CircBuff write_buf;
+        OutBuff write_buf;
 
-        CircBuff read_buf;
+        InBuff read_buf;
 
         int read_into_buf();
 
@@ -96,9 +105,11 @@ class WiFiPayload {
 
         const char* networkPswd = "bilgepump";
 
-        const char * udpAddress = "192.168.1.86";
+        const char* udpAddress = "192.168.1.86";
 
         const unsigned int udpPort = 12345;
+
+        WiFiClass* myWiFi = NULL; // such a shame... The extern WiFiClass object "WiFi" makes this necessary to wrap WiFiEvent in the WiFiPayload class
         
         WiFiUDP udp;
 
@@ -111,6 +122,23 @@ class WiFiPayload {
         char device_name[25] = "No_Name";
 
         int time = -1; // heartbeat immediately (will always pass if statement within 3 seconds)
+
+        class HashPrint : public Print {
+            
+            public:
+
+                HashPrint();
+
+                virtual size_t write(uint8_t c);
+
+                uint32_t hash() const;
+
+            private:
+
+                FastCRC32 _hasher;
+
+                uint32_t _hash;
+        };
 };
 
 

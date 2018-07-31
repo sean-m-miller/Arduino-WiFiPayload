@@ -1,13 +1,21 @@
 #include "Arduino.h"
 #include "WiFiPayload.h"
 
-bool connected = false;
+//bool connected = false; // wrap with function WiFiPayload::connected(), keep connected private in WiFiPayload
 
 //WiFiUDP udp;
 
 WiFiPayload::WiFiPayload(){}
 
 WiFiPayload::~WiFiPayload(){}
+
+void WiFiPayload::begin(){
+    myWiFi = &WiFi; 
+}
+
+bool WiFiPayload::is_connected(){
+    return connected;
+}
 
 void WiFiPayload::set_device_name(const char* name){
     if(strlen(name) < 25){ //arbitrary max length for device name
@@ -46,24 +54,33 @@ size_t WiFiPayload::write(){
     }
 
     out_data.DATAroot["msg_type"] = "transmission"; // add to root object, not 
-    out_data.DATAroot["ip"] = WiFi.localIP().toString();
+    out_data.DATAroot["ip"] = myWiFi->localIP().toString();
     out_data.DATAroot["device_name"] = device_name;
-    
-    //data->root.set<unsigned long>("timestamp", ts);
 
-    mes_length = out_data.jsonBuffer.size(); // returns number of bytes being used in the array by jsonObjects. 
-    // Set so that write_to_circ has access to it (data object might be destroyed before )
+    // generate crc hash https://arduinojson.org/v5/doc/tricks/
 
-    out_data.DATAroot.printTo(write_mes_buf, mes_length); // convert from JSON object to c string
+    HashPrint crc;
+    out_data.DATAroot.printTo(crc);
+    uint32_t crc_hash = crc.hash();
 
-    write_buf.write(write_mes_buf, mes_length);
-    out_data.clear();
-    out_data.DATAroot = out_data.jsonBuffer.createObject();
-    if(!out_data.DATAroot.success()){
-        Serial.println("Outgoing_constructor failed, JsonObject not created out of jsonBuffer");
-        return 0;
+    char crc_str[10]; // uint32_t max is 4 billion, 10 digits decimal
+
+    memset(crc_str, '\0', 10);
+
+    for(size_t i = 0; i < 10; i++){
+        crc_str[9-i] = (crc_hash % 10) + '0'; // plus '0' to convert to ascii digits
+        crc_hash = crc_hash / 10;
     }
-    out_data.create_object("data", out_data.DATAroot); // have this call here since clearing an Incoming message should not add a data object after resetting hash table.
+
+    strcpy(write_mes_buf, crc_str); // first 10 digits are crc hash
+
+    out_data.DATAroot.printTo(&write_mes_buf[10], out_data.jsonBuffer.size()); // convert from JSON object to c string
+
+    mes_length = (out_data.jsonBuffer.size() + 10); // returns number of bytes being used in the array by jsonObjects. 
+
+    write_buf.receive_out(write_mes_buf, mes_length);
+    out_data.clear();
+     // have this call here since clearing an Incoming message should not add a data object after resetting hash table.
     return 1;
 }
 
@@ -77,11 +94,12 @@ int WiFiPayload::read_into_buf(){ // if a packet has been recieved, write it int
             read_buf.start_msg();        
             for(size_t i = 0; i < packetSize; i++){
 
-                read_buf.write_char(udp.read());
+                read_buf.receive_char(udp.read());
 
                 count ++;
 
             }
+            read_buf.receive_char('\0'); // add null character so that extracted messages can be read as c strings. 
             read_buf.end_msg();
         }
     }
@@ -96,20 +114,55 @@ size_t WiFiPayload::read(){ // clears current read message. return size of first
     
     Serial.println("VALUE OF extract_message()");
         
-    size_t y = read_buf.extract_message(read_mes_buf);
+    size_t y = read_buf.send_message(read_mes_buf);
 
     Serial.println(y);
 
-    in_data.DATAroot = in_data.jsonBuffer.parseObject(read_mes_buf);
+    // extract crc
+
+    char message_without_crc[1024];
+
+    uint32_t claimed_crc = 0;
+
+    for(size_t i = 0; i < 10; i++){
+        claimed_crc = claimed_crc + (read_mes_buf[i] - '0');
+        if(i == 9){
+            break; //don't multiply by 10 after adding digit in the 10's place
+        }
+        claimed_crc = claimed_crc * 10;
+    }
+
+    strcpy(message_without_crc, &read_mes_buf[10]);
+
+    Serial.println(message_without_crc);
+
+    in_data.DATAroot = in_data.jsonBuffer.parseObject(message_without_crc);
+
+    if(!in_data.DATAroot.success()){
+        Serial.println("PARSING FAILED");
+    }
+
+    //calculate crc
+
+    HashPrint crc;
+    in_data.DATAroot.printTo(crc);
+    uint32_t calculated_crc = crc.hash();
+
+    if(claimed_crc != calculated_crc){
+        Serial.println("CRC DID NOT MATCH");
+        Serial.println(claimed_crc);
+        Serial.println(calculated_crc);
+        return 0;
+    }
 
     Serial.println("before create obj map line 101");
 
-    int x = in_data.DATAroot["data"]["b"];
-    Serial.println(x);
-
     if(in_data.DATAroot.success()){ // checks for valid JSON
-        x = in_data.DATAroot["data"]["b"];
+        int x = in_data.DATAroot["data"]["b"];
         Serial.println(x);
+
+        
+
         in_data.create_obj_map(in_data.DATAroot);
         x = in_data.DATAroot["data"]["b"];
         Serial.println(x);
@@ -138,19 +191,46 @@ void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and se
         //time = sec;
     char heart_buf[100]; // largest possible heartbeat message: 192.168.1.143 used 66 bytes, if ip in form WWW.XXX.YYY.ZZZ, would use two more bytes. 
 
+    Serial.println("line 147 in heartbeat");
+
     StaticJsonBuffer<100> tempBuffer; // buffer on stack. Use DynamicJsonBuffer for buffer on heap.
     JsonObject& temp_root = tempBuffer.createObject(); // initialize root of JSON object. Memory freed when root goes out of scope.
     temp_root.set<String>("msg_type", "heartbeat");
-    temp_root.set<String>("ip", WiFi.localIP().toString());
+    temp_root.set<String>("ip", myWiFi->localIP().toString());
     temp_root.set<String>("device_name", device_name);
 
-    temp_root.printTo(heart_buf, 100);
+    Serial.println("line 155 in heartbeat");
+
+    HashPrint crc;
+    temp_root.printTo(crc);
+    uint32_t crc_hash = crc.hash();
+
+    Serial.println("line 161 in heartbeat");
+
+    char crc_str[11]; // uint32_t max is 4 billion, 10 digits decimal
+
+    memset(crc_str, '\0', 10);
+
+    for(size_t i = 0; i < 10; i++){
+        crc_str[9-i] = (crc_hash % 10) + '0'; // plus '0' to convert to ascii digits
+        crc_hash = crc_hash / 10;
+    }
+
+    Serial.println("line 172 in heartbeat");
+
+    crc_str[10] = '\0';
+
+    strcpy(heart_buf, crc_str); // first 10 digits are crc hash
+
+    Serial.println("line 174 in heartbeat");
+
+    temp_root.printTo(&heart_buf[10], tempBuffer.size()); // convert from JSON object to c string
 
     //write to circ_buf
-    write_buf.write(heart_buf, 100); // no null characters in this message ever besides the terminating one hopefully
+    write_buf.receive_out(heart_buf, tempBuffer.size() + 10); // no null characters in this message ever besides the terminating one hopefully
         //delay(10000);
     // }
-    write_buf.read(udp, udpAddress, udpPort);
+    write_buf.send_out(udp, udpAddress, udpPort);
 
     read_into_buf();
 }
@@ -161,7 +241,7 @@ void WiFiPayload::WiFiEvent(WiFiEvent_t event){
       case SYSTEM_EVENT_STA_GOT_IP:
           //When connected set 
           Serial.print("WiFi connected! IP address: ");
-          Serial.println(WiFi.localIP()); 
+          Serial.println(myWiFi->localIP()); 
           
           //initializes the UDP state
           //This initializes the transfer buffer
@@ -182,35 +262,28 @@ void WiFiPayload::connectToWiFi(){
     Serial.println("Connecting to WiFi network: " + String(networkName));
     
     // delete old config
-    Serial.print(WiFi.disconnect(true));
+    Serial.print(myWiFi->disconnect(true));
 
     Serial.println("udp.begin()");
     Serial.println(udp.begin(udpPort));
 
     //register event handler
-    WiFi.onEvent(WiFiEvent);
+    myWiFi->onEvent(WiFiEvent);
   
     //Initiate connection
-    WiFi.begin(networkName, networkPswd); // password must be chars with ASCII values between 32-126 (decimal)
+    myWiFi->begin(networkName, networkPswd); // password must be chars with ASCII values between 32-126 (decimal)
 
     Serial.println("Waiting for WIFI connection...");
 }
 
-// size_t WiFiPayload::write_in_msg(){
+WiFiPayload::HashPrint::HashPrint(){
+    _hash = _hasher.crc32(NULL, 0);
+}
 
-//     in_data.add_data("msg_type", "transmission"); // add to root object, not 
-//     in_data.add_data("ip", WiFi.localIP().toString());
-//     in_data.add_data("device_name", device_name);
-    
-//     //data->root.set<unsigned long>("timestamp", ts);
+size_t WiFiPayload::HashPrint::write(uint8_t c){
+    _hash = _hasher.crc32_upd(&c, 1);
+}
 
-//     mes_length = in_data.jsonBuffer.size(); // returns number of bytes being used in the array by jsonObjects. 
-//     // Set so that write_to_circ has access to it (data object might be destroyed before )
-
-//     in_data.DATAroot.printTo(write_mes_buf, mes_length); // convert from JSON object to c string
-
-//     write_buf.write(write_mes_buf, mes_length);
-//     in_data.clear();
-    
-//     return 1;
-// }
+uint32_t WiFiPayload::HashPrint::hash() const {
+    return _hash;
+}
