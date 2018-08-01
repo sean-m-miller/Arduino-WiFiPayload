@@ -1,7 +1,7 @@
 #include "Arduino.h"
 #include "WiFiPayload.h"
 
-//bool connected = false; // wrap with function WiFiPayload::connected(), keep connected private in WiFiPayload
+bool connected = false; // wrap with function WiFiPayload::connected(), keep connected private in WiFiPayload
 
 //WiFiUDP udp;
 
@@ -13,9 +13,13 @@ void WiFiPayload::begin(){
     myWiFi = &WiFi; 
 }
 
-bool WiFiPayload::is_connected(){
-    return connected;
+size_t WiFiPayload::msg_size(){
+    return out_data.msg_size();
 }
+
+// bool WiFiPayload::is_connected(){
+//     return connected;
+// }
 
 void WiFiPayload::set_device_name(const char* name){
     if(strlen(name) < 25){ //arbitrary max length for device name
@@ -63,20 +67,27 @@ size_t WiFiPayload::write(){
     out_data.DATAroot.printTo(crc);
     uint32_t crc_hash = crc.hash();
 
-    char crc_str[10]; // uint32_t max is 4 billion, 10 digits decimal
+    uint32_t copy = crc_hash;
 
-    memset(crc_str, '\0', 10);
+    size_t crc_digits = 0;
 
-    for(size_t i = 0; i < 10; i++){
-        crc_str[9-i] = (crc_hash % 10) + '0'; // plus '0' to convert to ascii digits
+    while(copy != 0){
+        crc_digits++;
+        copy = copy / 10;
+    }
+
+    for(size_t i = 0; i < crc_digits; i++){
+        write_mes_buf[(crc_digits-1)-i] = (crc_hash % 10) + '0'; // plus '0' to convert to ascii digits
         crc_hash = crc_hash / 10;
     }
 
-    strcpy(write_mes_buf, crc_str); // first 10 digits are crc hash
+    out_data.DATAroot.printTo(&write_mes_buf[crc_digits], out_data.jsonBuffer.size()); // convert from JSON object to c string
 
-    out_data.DATAroot.printTo(&write_mes_buf[10], out_data.jsonBuffer.size()); // convert from JSON object to c string
+    Serial.println("MESSAGE BEING WRITTEN TO DDS");
 
-    mes_length = (out_data.jsonBuffer.size() + 10); // returns number of bytes being used in the array by jsonObjects. 
+    Serial.println(write_mes_buf);
+
+    mes_length = (out_data.jsonBuffer.size() + crc_digits); // returns number of bytes being used in the array by jsonObjects. 
 
     write_buf.receive_out(write_mes_buf, mes_length);
     out_data.clear();
@@ -99,7 +110,7 @@ int WiFiPayload::read_into_buf(){ // if a packet has been recieved, write it int
                 count ++;
 
             }
-            read_buf.receive_char('\0'); // add null character so that extracted messages can be read as c strings. 
+            //read_buf.receive_char('\0'); // add null character so that extracted messages can be read as c strings. 
             read_buf.end_msg();
         }
     }
@@ -124,29 +135,71 @@ size_t WiFiPayload::read(){ // clears current read message. return size of first
 
     uint32_t claimed_crc = 0;
 
-    for(size_t i = 0; i < 10; i++){
+    size_t i = 0;
+
+    while(read_mes_buf[i] != '{'){
         claimed_crc = claimed_crc + (read_mes_buf[i] - '0');
-        if(i == 9){
+        if(read_mes_buf[i + 1] == '{'){
             break; //don't multiply by 10 after adding digit in the 10's place
         }
         claimed_crc = claimed_crc * 10;
+        i++;
     }
 
-    strcpy(message_without_crc, &read_mes_buf[10]);
+    uint8_t message_from_dds[1024];
 
-    Serial.println(message_without_crc);
+    Serial.println("message from DDS:");
 
-    in_data.DATAroot = in_data.jsonBuffer.parseObject(message_without_crc);
+     Serial.println(strlen(&read_mes_buf[i+1]));
+
+    for(size_t j = 0; j < strlen(&read_mes_buf[i+1]); j++){
+        message_from_dds[j] = read_mes_buf[i+1+j];
+    }
+
+    FastCRC32 CRC32;
+
+    uint32_t calculated_crc = CRC32.crc32(message_from_dds, strlen(&read_mes_buf[i+1]));
+
+    in_data.DATAroot = in_data.jsonBuffer.parseObject(&read_mes_buf[i+1], 50);
 
     if(!in_data.DATAroot.success()){
-        Serial.println("PARSING FAILED");
+         Serial.println("PARSING FAILED");
     }
 
-    //calculate crc
+    
 
-    HashPrint crc;
-    in_data.DATAroot.printTo(crc);
-    uint32_t calculated_crc = crc.hash();
+    //  char serialized_message[1024];
+
+    //  in_data.DATAroot.printTo(serialized_message);
+
+    //  Serial.println("differences below:");
+
+    //  Serial.println("Serialized MEssage:");
+
+    //  Serial.println(strlen(serialized_message));
+
+     
+
+    //  for(size_t k = 0; k <strlen(serialized_message); k++){
+    //      if(serialized_message[k] == message_from_dds[k]){
+    //          Serial.print("Different on line ");
+    //          Serial.print(k);
+    //          Serial.print(" serialized is ");
+    //          Serial.print((int)serialized_message[k]);
+    //          Serial.print(" message_from_dds is ");
+    //          Serial.println(message_from_dds[k]);
+    //      }
+    //  }
+
+    //  if(strcmp(serialized_message, message_from_dds)){
+    //     Serial.println("Serialized Message is Different than non-serialized message!!!!!! line 164 WiFiPayload");
+        
+    //  }
+    // //calculate crc
+
+    // // HashPrint crc;
+    // // in_data.DATAroot.printTo(crc);
+    // // uint32_t calculated_crc = crc.hash();
 
     if(claimed_crc != calculated_crc){
         Serial.println("CRC DID NOT MATCH");
@@ -205,26 +258,31 @@ void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and se
     temp_root.printTo(crc);
     uint32_t crc_hash = crc.hash();
 
+    uint32_t copy = crc_hash;
+
+    size_t crc_digits = 0;
+
+    while(copy != 0){
+        crc_digits++;
+        copy = copy / 10;
+    }
+
     Serial.println("line 161 in heartbeat");
 
-    char crc_str[11]; // uint32_t max is 4 billion, 10 digits decimal
-
-    memset(crc_str, '\0', 10);
-
-    for(size_t i = 0; i < 10; i++){
-        crc_str[9-i] = (crc_hash % 10) + '0'; // plus '0' to convert to ascii digits
+    for(size_t i = 0; i < crc_digits; i++){
+        heart_buf[(crc_digits-1)-i] = (crc_hash % 10) + '0'; // plus '0' to convert to ascii digits
         crc_hash = crc_hash / 10;
     }
 
     Serial.println("line 172 in heartbeat");
 
-    crc_str[10] = '\0';
-
-    strcpy(heart_buf, crc_str); // first 10 digits are crc hash
-
     Serial.println("line 174 in heartbeat");
 
-    temp_root.printTo(&heart_buf[10], tempBuffer.size()); // convert from JSON object to c string
+    temp_root.printTo(&heart_buf[crc_digits], tempBuffer.size()); // convert from JSON object to c string
+
+    Serial.println("HEARTBEAT BEING SENT TO DDS");
+
+    Serial.println(heart_buf);
 
     //write to circ_buf
     write_buf.receive_out(heart_buf, tempBuffer.size() + 10); // no null characters in this message ever besides the terminating one hopefully
@@ -241,7 +299,7 @@ void WiFiPayload::WiFiEvent(WiFiEvent_t event){
       case SYSTEM_EVENT_STA_GOT_IP:
           //When connected set 
           Serial.print("WiFi connected! IP address: ");
-          Serial.println(myWiFi->localIP()); 
+          Serial.println(WiFi.localIP()); 
           
           //initializes the UDP state
           //This initializes the transfer buffer

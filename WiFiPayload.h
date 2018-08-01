@@ -13,7 +13,7 @@
 
 #include <FastCRC.h> // https://github.com/FrankBoesing/FastCRC
 
-//extern bool connected;
+extern bool connected;
 
 #define MESSAGE_SIZE 1024
 
@@ -25,9 +25,11 @@ class WiFiPayload {
 
         ~WiFiPayload();
 
+        size_t msg_size();
+
         void begin(); // set pointers to the externed WiFi and Udp objects.
 
-        bool is_connected();
+        // bool is_connected();
 
         void set_device_name(const char* name);
 
@@ -89,7 +91,7 @@ class WiFiPayload {
 
         Incoming_Data in_data;
 
-        bool connected = false;
+        //bool connected = false;
 
         bool ready = false;
 
