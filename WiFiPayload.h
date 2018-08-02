@@ -10,40 +10,66 @@
 #include <Incoming_Data.h>
 #include <OutBuff.h>
 #include <InBuff.h>
+#include <Values.h> // for values namespace
 
 #include <FastCRC.h> // https://github.com/FrankBoesing/FastCRC
 
 extern bool connected;
 
-#define MESSAGE_SIZE 1024
+/* ERROR CODES:
+     0 Success
+    -1 key_ or index does not exist
+    -2 key_ or index already exists
+    -3 JsonObject function called on JsonArray, or vice versa
+    -4 Message is full */
 
 class WiFiPayload {
     
     public:
 
-        WiFiPayload();
+         /**
+         * @brief Constructor that takes in 
+         * 
+         * @param ssid (network name), network password, ip of rpi server, port that rpi server is listening on.
+         */
+        WiFiPayload(const char* ssid, const char* pswd, const char* udpAdd, const int udpP);
 
+        /**
+         * @brief Destructor that does nothing 
+         */
         ~WiFiPayload();
 
-        size_t msg_size();
+        /**
+         * @brief returns the number of bytes being used (plus dead space) by the buffer storing the message to DDS. 
+         */
+        size_t out_msg_size();
 
-        void begin(); // set pointers to the externed WiFi and Udp objects.
+        /**
+         * @brief returns the size of the message (in bytes) received from DDS.
+         */
+        size_t in_msg_size();
 
-        // bool is_connected();
+        void begin(); // set myWiFi to the externed WiFi object.
 
-        void set_device_name(const char* name);
+        bool is_connected();
+        /**
+         * @brief sets the name of this device. This function must be called before messages can be written to DDS. 
+         * 
+         * @param ssid (network name), network password, ip of rpi server, port that rpi server is listening on.
+         */
+        int set_device_name(const char* name);
 
         template<typename T> size_t add_data(const char* key_, T t){ // relies on implicit casts, overwrites if index already exists
             return out_data.add_data(key_, t);
         };
 
-        size_t add_object(const char* key_); // wrapper around create_object
+        int add_object(const char* key_); // wrapper around create_object
 
-        size_t add_array(const char* key_); // wrapper around create_array
+        int add_array(const char* key_); // wrapper around create_array
 
-        size_t create_nested_array(const char* key_, const char* arr_key);
+        int create_nested_array(const char* key_, const char* arr_key);
 
-        size_t create_nested_object(const char* key_, const char* obj_key);
+        int create_nested_object(const char* key_, const char* obj_key);
 
         //custom_object overload
         template<typename T> int add_to_object(const char* key_, const char* index, T t){ // add data to either custom_array or custom_object
@@ -55,27 +81,27 @@ class WiFiPayload {
             return out_data.add_to_array(key_, index, t); //key not found or function was called on object
         }
 
-        size_t write();
+        int write();
 
-        template<typename T> size_t parse_data(const char* key_, T& destination){
+        template<typename T> int parse_data(const char* key_, T& destination){
             return in_data.parse_data(key_, destination);
         }
 
-        template<typename T> size_t parse_object(const char* key_, const char* index, T& destination){
+        template<typename T> int parse_object(const char* key_, const char* index, T& destination){
             return in_data.parse_object(key_, index, destination);
         }
 
-        template<typename T> size_t parse_array(const char* key_, size_t index, T& destination){
+        template<typename T> int parse_array(const char* key_, size_t index, T& destination){
             return in_data.parse_array(key_, index, destination);
         }
 
-        size_t parse_data_string(const char* key_, char* destination); // overload for basic field
+        int parse_data_string(const char* key_, char* destination); // overload for basic field
 
-        size_t parse_object_string(const char* key_, const char* index, char* destination); // overload for custom object
+        int parse_object_string(const char* key_, const char* index, char* destination); // overload for custom object
 
-        size_t parse_array_string(const char* key_, size_t index, char* destination); // overload for custom array
+        int parse_array_string(const char* key_, size_t index, char* destination); // overload for custom array
 
-        size_t read();
+        int read();
 
         void connectToWiFi();
 
@@ -87,15 +113,15 @@ class WiFiPayload {
 
     private:
 
+
+
         Outgoing_Data out_data;
 
         Incoming_Data in_data;
 
-        //bool connected = false;
+        bool connected;
 
-        bool ready = false;
-
-        static void WiFiEvent(WiFiEvent_t event);
+        //void WiFiEvent(WiFiPayload* self, WiFiEvent_t event); // implied static as well
 
         OutBuff write_buf;
 
@@ -103,21 +129,21 @@ class WiFiPayload {
 
         int read_into_buf();
 
-        const char* networkName = "OpenROV";
+        char networkName[30];
 
-        const char* networkPswd = "bilgepump";
+        char networkPswd[30];
 
-        const char* udpAddress = "192.168.1.86";
+        char udpAddress[30];
 
-        const unsigned int udpPort = 12345;
+        unsigned int udpPort;
 
         WiFiClass* myWiFi = NULL; // such a shame... The extern WiFiClass object "WiFi" makes this necessary to wrap WiFiEvent in the WiFiPayload class
         
         WiFiUDP udp;
 
-        char write_mes_buf[MESSAGE_SIZE]; // max size of message
+        char write_mes_buf[values::MESSAGE_SIZE]; // max size of message
 
-        char read_mes_buf[MESSAGE_SIZE];
+        char read_mes_buf[values::MESSAGE_SIZE];
 
         int mes_length = 0;
 
