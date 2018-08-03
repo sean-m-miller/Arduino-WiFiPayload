@@ -71,7 +71,7 @@ int WiFiPayload::write(){
 
     // generate crc hash https://arduinojson.org/v5/doc/tricks/
 
-    out_data.DATAroot.printTo(&write_mes_buf[4], strlen(&write_mes_buf[4]));
+    out_data.DATAroot.printTo(&write_mes_buf[4], out_data.jsonBuffer.size());
 
     FastCRC32 CRC32;
 
@@ -86,7 +86,11 @@ int WiFiPayload::write(){
 
     Serial.println(write_mes_buf);
 
-    mes_length = (strlen(write_mes_buf)); // returns number of bytes being used in the array by jsonObjects. 
+    mes_length = (strlen(&write_mes_buf[4]) + 4); // in case one of the
+
+    for(int i = 0; i < mes_length; i++){
+        Serial.println((uint8_t)write_mes_buf[i]);
+    }
 
     write_buf.receive_out(write_mes_buf, mes_length);
     out_data.clear();
@@ -95,9 +99,9 @@ int WiFiPayload::write(){
 
 int WiFiPayload::read_into_buf(){ // if a packet has been recieved, write it into read_buf
     int packetSize = udp.parsePacket();
-    size_t count = 0;
+    int count = 0;
     if (packetSize){
-        if(read_buf.checkCapacity(packetSize)){
+        if(read_buf.checkSize(packetSize)){
             read_buf.start_msg();        
             for(size_t i = 0; i < packetSize; i++){
                 read_buf.receive_char(udp.read());
@@ -121,7 +125,13 @@ int WiFiPayload::read(){ // clears current read message. return size of first me
         
         // extract crc
 
-        uint32_t claimed_crc = read_mes_buf[0] << 3*8 | read_mes_buf[1] << 2*8 | read_mes_buf[2] << 8 | read_mes_buf[3];
+        uint8_t incoming_crc[4];
+
+        for(size_t i = 0; i < 4; i++){
+            incoming_crc[i] = read_mes_buf[i];
+        }
+
+        uint32_t claimed_crc = incoming_crc[0] << 3*8 | incoming_crc[1] << 2*8 | incoming_crc[2] << 8 | incoming_crc[3];
 
         Serial.println("message from DDS:");
 
@@ -144,7 +154,7 @@ int WiFiPayload::read(){ // clears current read message. return size of first me
 
         if(in_data.DATAroot.success()){ // checks for valid JSON
             ready = true; // set ready true, so that if create_obj_map fails, clear() from the next read() will reset hash table
-            in_data.create_obj_map(in_data.DATAroot);
+            in_data.create_obj_map(in_data.DATAroot["data"]); // only want user_generated fields
             if(in_data.DATAroot.success()){
                 return 0; // obj_map and in_data have been successfully created out of incoming message.
             }
@@ -166,9 +176,7 @@ int WiFiPayload::parse_data_string(const char* key_, char* destination){ // data
 }
 
 void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and send data from circ_buf, send heartbeat every 3 seconds
-    // int sec = second();
-    // if((sec != time) && (sec % 3 == 0)){ // if its not the same second as last heartbeat, and if its 3 seconds after the last heartbeat.
-        //time = sec;
+
     if(myWiFi->status() == WL_CONNECTED){
         connected = true;
 
@@ -199,6 +207,10 @@ void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and se
 
         temp_root.printTo(&heart_buf[4], tempBuffer.size()); // convert from JSON object to c string
 
+        for(int i = 0; i < tempBuffer.size() + 4; i++){
+            Serial.println((uint8_t)heart_buf[i]);
+        }
+
         Serial.println("HEARTBEAT BEING SENT TO DDS");
 
         Serial.println(heart_buf);
@@ -213,8 +225,6 @@ void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and se
     else{
         connected = false;
     }
-
-    
 }
 
 //wifi event handler

@@ -113,13 +113,11 @@ class WiFiPayload {
 
     private:
 
-
-
         Outgoing_Data out_data;
 
         Incoming_Data in_data;
 
-        bool connected;
+        volatile bool connected;
 
         //void WiFiEvent(WiFiPayload* self, WiFiEvent_t event); // implied static as well
 
