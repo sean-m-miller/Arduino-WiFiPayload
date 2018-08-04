@@ -1,8 +1,6 @@
 #include "Arduino.h"
 #include "WiFiPayload.h"
 
-bool connected = false; // wrap with function WiFiPayload::connected(), keep connected private in WiFiPayload
-
 WiFiPayload::WiFiPayload(const char* ssid, const char* pswd, const char* udpAdd, const int udpP) : udpPort(udpP) {
     strcpy(networkName, ssid);
     strcpy(networkPswd, pswd);
@@ -35,12 +33,12 @@ int WiFiPayload::set_device_name(const char* name){
     return -1;
 }
 
-void WiFiPayload::print_out_data_to(char* destination, size_t size){
-    out_data.print_to(destination, size);
+void WiFiPayload::print_out_data_to(char* destination, size_t size_of_data){
+    out_data.DATAroot.printTo(destination, size_of_data);
 }
 
-void WiFiPayload::print_in_data_to(char* destination, size_t size){
-    in_data.print_to(destination, size);
+void WiFiPayload::print_in_data_to(char* destination, size_t size_of_data){
+    in_data.DATAroot.printTo(destination, size_of_data);
 }
 
 int WiFiPayload::add_array(const char* key_){
@@ -124,7 +122,6 @@ int WiFiPayload::read(){ // clears current read message. return size of first me
     if(message_size){ // a message was read
         
         // extract crc
-
         uint8_t incoming_crc[4];
 
         for(size_t i = 0; i < 4; i++){
@@ -139,7 +136,7 @@ int WiFiPayload::read(){ // clears current read message. return size of first me
 
         FastCRC32 CRC32;
 
-        uint32_t calculated_crc = CRC32.crc32((uint8_t*) &read_mes_buf[4], strlen(&read_mes_buf[4]));
+        uint32_t calculated_crc = CRC32.crc32((uint8_t*)&read_mes_buf[4], strlen(&read_mes_buf[4]));
 
         in_data.DATAroot = in_data.jsonBuffer.parseObject(&read_mes_buf[4], 50);
 
@@ -154,25 +151,37 @@ int WiFiPayload::read(){ // clears current read message. return size of first me
 
         if(in_data.DATAroot.success()){ // checks for valid JSON
             ready = true; // set ready true, so that if create_obj_map fails, clear() from the next read() will reset hash table
-            in_data.create_obj_map(in_data.DATAroot["data"]); // only want user_generated fields
+            in_data.create_obj_map(in_data.DATAroot); // only want user_generated fields
             if(in_data.DATAroot.success()){
+                Serial.println("line 156");
+                ready = true;
                 return 0; // obj_map and in_data have been successfully created out of incoming message.
             }
+            ready = false;
         }
     }
     return -1;
 }
 
 int WiFiPayload::parse_array_string(const char* key_, size_t index, char* destination){ // custom array overload
-    return in_data.parse_array_string(key_, index, destination);
+    if(ready){
+        return in_data.parse_array_string(key_, index, destination);
+    }
+    return -5;
 }
 
 int WiFiPayload::parse_object_string(const char* key_, const char* index, char* destination){ // custom object overload
-    return in_data.parse_object_string(key_, index, destination);
+    if(ready){
+        return in_data.parse_object_string(key_, index, destination);
+    }
+    return -5;
 }
 
 int WiFiPayload::parse_data_string(const char* key_, char* destination){ // data field overload
-    return in_data.parse_data_string(key_, destination);
+    if(ready){
+        return in_data.parse_data_string(key_, destination);
+    }
+    return -5;
 }
 
 void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and send data from circ_buf, send heartbeat every 3 seconds
@@ -224,31 +233,11 @@ void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and se
     }
     else{
         connected = false;
+
+        // retry connection..? Hard to test if this is necessary. Check to see if WiFi.begin() tells WiFi to retry connection if it disconnects.
+        //connectToWiFi(); 
     }
 }
-
-//wifi event handler
-// void WiFiPayload::WiFiEvent(WiFiPayload* self, WiFiEvent_t event){
-//     switch(event) {
-//       case SYSTEM_EVENT_STA_GOT_IP:
-//           //When connected set 
-//           Serial.print("WiFi connected! IP address: ");
-//           Serial.println(self->myWiFi->localIP()); 
-          
-//           //initializes the UDP state
-//           //This initializes the transfer buffer
-          
-//           self->connected = true;
-//           break;
-//       case SYSTEM_EVENT_STA_DISCONNECTED:
-//           Serial.println("WiFi lost connection");
-//           self->connected = false;
-//           break;
-
-//     //   case SYSTEM_EVENT_STA_LOST_IP:
-//     //       Serial.println("Connected, but IP Reset, so ")
-//     }
-// }
 
 void WiFiPayload::connectToWiFi(){
     Serial.println("Connecting to WiFi network: " + String(networkName));
@@ -258,25 +247,9 @@ void WiFiPayload::connectToWiFi(){
 
     Serial.println("udp.begin()");
     Serial.println(udp.begin(udpPort));
-
-    //register event handler
-
-    //WiFi.onEvent(WiFiEvent(this));
   
     //Initiate connection
     WiFi.begin(networkName, networkPswd); // password must be chars with ASCII values between 32-126 (decimal)
 
     Serial.println("Waiting for WIFI connection...");
-}
-
-WiFiPayload::HashPrint::HashPrint(){
-    _hash = _hasher.crc32(NULL, 0);
-}
-
-size_t WiFiPayload::HashPrint::write(uint8_t c){
-    _hash = _hasher.crc32_upd(&c, 1);
-}
-
-uint32_t WiFiPayload::HashPrint::hash() const {
-    return _hash;
 }

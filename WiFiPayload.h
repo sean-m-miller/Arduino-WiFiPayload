@@ -83,16 +83,27 @@ class WiFiPayload {
 
         int write();
 
+        int read();
+
         template<typename T> int parse_data(const char* key_, T& destination){
-            return in_data.parse_data(key_, destination);
+            if(ready){
+                return in_data.parse_data(key_, destination);
+            }
+            return -5;
         }
 
         template<typename T> int parse_object(const char* key_, const char* index, T& destination){
-            return in_data.parse_object(key_, index, destination);
+            if(ready){
+                return in_data.parse_object(key_, index, destination);
+            }
+            return -5;
         }
 
         template<typename T> int parse_array(const char* key_, size_t index, T& destination){
-            return in_data.parse_array(key_, index, destination);
+            if(ready){
+                return in_data.parse_array(key_, index, destination);
+            }
+            return -5;
         }
 
         int parse_data_string(const char* key_, char* destination); // overload for basic field
@@ -101,25 +112,23 @@ class WiFiPayload {
 
         int parse_array_string(const char* key_, size_t index, char* destination); // overload for custom array
 
-        int read();
-
-        void connectToWiFi();
-
         void heartbeat();
 
-        void print_out_data_to(char* destination, size_t size);
+        void print_out_data_to(char* destination, size_t size_of_data);
 
-        void print_in_data_to(char* destination, size_t size);
+        void print_in_data_to(char* destination, size_t size_of_data);
 
     private:
+
+        void connectToWiFi();
 
         Outgoing_Data out_data;
 
         Incoming_Data in_data;
 
-        volatile bool connected;
+        volatile bool connected = false;
 
-        //void WiFiEvent(WiFiPayload* self, WiFiEvent_t event); // implied static as well
+        volatile bool ready = false; // DATAroot is valid and ready to be parsed
 
         OutBuff write_buf;
 
@@ -146,25 +155,6 @@ class WiFiPayload {
         int mes_length = 0;
 
         char device_name[25] = "No_Name";
-
-        int time = -1; // heartbeat immediately (will always pass if statement within 3 seconds)
-
-        class HashPrint : public Print {
-            
-            public:
-
-                HashPrint();
-
-                virtual size_t write(uint8_t c);
-
-                uint32_t hash() const;
-
-            private:
-
-                FastCRC32 _hasher;
-
-                uint32_t _hash;
-        };
 };
 
 
