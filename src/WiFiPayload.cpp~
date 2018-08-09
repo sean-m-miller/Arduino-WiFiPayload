@@ -1,5 +1,5 @@
 #include "Arduino.h"
-#include "WiFiPayload.h"
+#include "WiFiPayload.hpp"
 
 WiFiPayload::WiFiPayload(const char* ssid, const char* pswd, const char* udpAdd, const int udpP) : udpPort(udpP) {
     strcpy(networkName, ssid);
@@ -243,13 +243,13 @@ void WiFiPayload::connectToWiFi(){
     Serial.println("Connecting to WiFi network: " + String(networkName));
     
     // delete old config
-    Serial.print(WiFi.disconnect(true));
+    Serial.print(myWiFi->disconnect(true));
 
     Serial.println("udp.begin()");
     Serial.println(udp.begin(udpPort));
   
     //Initiate connection
-    WiFi.begin(networkName, networkPswd); // password must be chars with ASCII values between 32-126 (decimal)
+    myWiFi->begin(networkName, networkPswd); // password must be chars with ASCII values between 32-126 (decimal)
 
     Serial.println("Waiting for WIFI connection...");
 }

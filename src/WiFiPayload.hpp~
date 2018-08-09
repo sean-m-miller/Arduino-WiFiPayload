@@ -1,20 +1,18 @@
-#ifndef WiFiPayload_h
-#define WiFiPayload_h
+#ifndef WiFiPayload_hpp
+#define WiFiPayload_hpp
 
 #include "Arduino.h"
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <ArduinoJson.h>
 #include <TimeLib.h>
-#include <Outgoing_Data.h>
-#include <Incoming_Data.h>
-#include <OutBuff.h>
-#include <InBuff.h>
-#include <Values.h> // for values namespace
+#include "Data/Outgoing_Data/Outgoing_Data.hpp>"
+#include "Data/Incoming_Data/Incoming_Data.hpp>"
+#include "CircBuff/OutBuff/OutBuff.hpp>"
+#include "CircBuff/InBuff/InBuff.hpp>"
+#include "Values.hpp" // for values namespace
 
 #include <FastCRC.h> // https://github.com/FrankBoesing/FastCRC
-
-extern bool connected;
 
 /* ERROR CODES:
      0 Success

@@ -1,0 +1,25 @@
+WiFiPayload	KEYWORD1
+add	KEYWORD2
+out_msg_size	KEYWORD2
+in_msg_size	KEYWORD2
+begin	KEYWORD2
+is_connected	KEYWORD2
+set_device_name	KEYWORD2
+add_data	KEYWORD2
+add_object	KEYWORD2
+add_array	KEYWORD2
+create_nested_array	KEYWORD2
+
+create_nested_object	KEYWORD2
+add_to_object	KEYWORD2
+add_to_array	KEYWORD2
+write	KEYWORD2
+read	KEYWORD2
+parse_data	KEYWORD2
+parse_object	KEYWORD2
+parse_data_string	KEYWORD2
+parse_object_string	KEYWORD2
+parse_array_string	KEYWORD2
+heartbeat	KEYWORD2
+print_out_data_to	KEYWORD2
+print_in_data_to	KEYWORD2
