@@ -22,6 +22,8 @@ class Outgoing_Data : public Data{
             if(it->var.as<JsonObject&>()[key_] = t){
                 return 0; // success
             }
+
+            it->get_field().as<JsonObject&>().remove(key_);
             return -4; // allocation failed because no space left in buffer
         }
         return -5; // unintended internal error
@@ -47,6 +49,9 @@ class Outgoing_Data : public Data{
                     if(it->get_field().as<JsonObject&>().set(index, t)){
                         return 0; // success
                     }
+
+                    // if buffer is full, field "index" gets generated, but no key is added, causing invalid Json 
+                    it->get_field().as<JsonObject&>().remove(index);
                     return -4; // JsonObject::set() returns false if JsonBuffer full
                 }
                 return -3; // key_ is an array
@@ -61,16 +66,36 @@ class Outgoing_Data : public Data{
         if(Node* it = find_custom(key_)){
             if(it->get_field().success()){
                 if(it->get_field().is<JsonArray>()){
+                    size_t count = 0;
                     if(index >= it->capacity){
                         while(it->capacity <= index){
-                            it->get_field().as<JsonArray&>().add(false); // what should be added to the empty space?
-                            it->capacity++;
+                            
+                            // if jsonBuffer becomes full while increasing capacity
+                            if(!it->get_field().as<JsonArray&>().add(false)){ // what should be added to the empty space?
+                                
+                                while(count > 0){
+                                    it->get_field().as<JsonArray&>().remove(it->capacity - 1);
+                                    it->capacity --;
+                                    count --;
+                                }
+                                return -4; // jsonBuffer full
+
+                            }
+                            count ++;
+                            it->capacity++; 
                         }                            
                     }
                     if(it->get_field().as<JsonArray&>().set(index, t)){
-                        return 0;
+                        return 0; // success
                     }
-                    return -4; // JsonArray::set() returns false if JsonBuffer full
+
+                    // attempt to add string into array but jsonBuffer full
+                    while(count > 0){
+                        it->get_field().as<JsonArray&>().remove(it->capacity - 1);
+                        it->capacity --;
+                        count --;
+                    }
+                    return -4; // JsonBuffer full
                 }
                 return -3; // key_ is an object
             }

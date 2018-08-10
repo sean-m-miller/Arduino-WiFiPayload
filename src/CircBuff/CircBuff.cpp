@@ -2,14 +2,16 @@
 #include "CircBuff.hpp"
 
 CircBuff::CircBuff(){
-    for(int i  = 0; i < values::CIRC_LENGTH/4; i++){
+    for(int i  = 0; i < values::STARTS_ENDS_SIZE; i++){
         starts[i] = NULL;
         ends[i] = NULL;
     }
 }
 
 bool CircBuff::checkSize(size_t value){
-    return (value < capacity && value < values::MESSAGE_SIZE); // leave one index to be safe? double check to make sure > -1 wouldn't break something
+
+    // will this incoming message of size value fit?
+    return (value <= capacity && value <= (values::MESSAGE_WITH_CRC_SIZE));
 }
 
 void CircBuff::add_start(size_t head){
@@ -20,7 +22,9 @@ void CircBuff::add_start(size_t head){
 void CircBuff::add_end(size_t head){
     char* temp = circ_buf + head;
     ends[add] = temp;
-    add = (add + 1) % (values::CIRC_LENGTH/4); //incriment so that next add is at next index of starts and ends
+
+    //incriment so that next add is at next index of starts and ends
+    add = (add + 1) % (values::STARTS_ENDS_SIZE); 
 }
 
 // CODE BELOW: used for debugging Circbuff

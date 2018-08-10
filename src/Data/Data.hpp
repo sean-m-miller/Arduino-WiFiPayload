@@ -17,7 +17,7 @@ class Data{
         void print_hash_table();
 
         // Buffer for storing Json objects
-        StaticJsonBuffer<1024> jsonBuffer; 
+        StaticJsonBuffer<values::MESSAGE_SIZE> jsonBuffer; 
 
         // "root" of the data object. 
         JsonVariant DATAroot;
@@ -99,7 +99,7 @@ class Data{
         // clears hash table, and resets jsonBuffer and DATAroot
         virtual void clear();
 
-    // bad practice but no way user could get access to this class
+    // bad practice but fine for now. No way user could get access to this class
     friend class WiFiPayload;
 
 };

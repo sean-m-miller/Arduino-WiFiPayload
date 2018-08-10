@@ -42,7 +42,7 @@ size_t WiFiPayload::out_msg_size(){
 size_t WiFiPayload::out_msg_space_left(){
 
     // amount of space left in the outgoing message. + 4 for crc
-    return(values::MESSAGE_SIZE - (out_data.msg_size() + 4)); // + 4 for crc
+    return(values::MESSAGE_SIZE - out_data.msg_size()); // + 4 for crc
 }
 
 size_t WiFiPayload::in_msg_size(){
@@ -120,7 +120,7 @@ int WiFiPayload::write(){
     // do not use strlen on index zero of write_mes_buf in the event that one of the 4 crc bytes evaluates to null char
     size_t mes_length = (strlen(&write_mes_buf[4]) + 4);
 
-    write_buf.receive_out(write_mes_buf, mes_length);
+    write_buf.push_outgoing_message(write_mes_buf, mes_length);
     out_data.clear();
 
     out_data.DATAroot["msg_type"] = "transmission";
@@ -141,7 +141,7 @@ int WiFiPayload::receive_into_read_buf(){
         if(read_buf.checkSize(packetSize)){
             read_buf.start_msg();        
             for(size_t i = 0; i < packetSize; i++){
-                read_buf.receive_char(udp.read());
+                read_buf.push_incoming_char(udp.read());
                 count ++;
             }
             read_buf.end_msg();
@@ -159,7 +159,7 @@ int WiFiPayload::read(){
     Serial.println("VALUE OF extract_message()");
     
     // pop message of read_buf and copy to read_mes_buf
-    size_t message_size = read_buf.send_message(read_mes_buf);
+    size_t message_size = read_buf.pop_incoming_message(read_mes_buf);
 
     // if we copied a message
     if(message_size){
@@ -252,10 +252,10 @@ void WiFiPayload::heartbeat(){
         Serial.println(heart_buf);
 
         // write to write_buf
-        write_buf.receive_out(heart_buf, tempBuffer.size() + 4); // no null characters in this message ever besides the terminating one hopefully
+        write_buf.push_outgoing_message(heart_buf, tempBuffer.size() + 4); // no null characters in this message ever besides the terminating one hopefully
         
         // send all messages that have been added to write_buf
-        write_buf.send_out(udp, udpAddress, udpPort);
+        write_buf.send_outgoing_messages(udp, udpAddress, udpPort);
 
         // if messages sent from DDS, write them into read_buf
         receive_into_read_buf();

@@ -3,8 +3,9 @@
 
 Outgoing_Data::Outgoing_Data(){
 
+    // ensure all map pointers are set to NULL
     for(size_t i = 0; i < 100; i++){
-        obj_map[i] = NULL; // ensure all map pointers are set to NULL
+        obj_map[i] = NULL; 
     }
     DATAroot = jsonBuffer.createObject();
 
@@ -12,6 +13,7 @@ Outgoing_Data::Outgoing_Data(){
         Serial.println("Outgoing_constructor failed, JsonObject not created out of jsonBuffer");
     }
 
+    // ready for user to add data
     create_object("data", DATAroot);
 }
 
@@ -21,73 +23,99 @@ Outgoing_Data::~Outgoing_Data(){
 
 int Outgoing_Data::create_object(const char* key_, JsonVariant& custom){
     if(!custom.is<JsonObject>() || !custom.success()){
-        // createNestedObject and array test for -3 error at the higher level. This case should only be hit by add_obect() or add_array() if "data" is invalid
+         // "data" created incorrectly, or invalid custom in hash table not removed.
         return -5;
     }
     int index = hash(key_);
-    if(Node* it = obj_map[index]){ // element already mapped there
+
+    // hash table collision
+    if(Node* it = obj_map[index]){ 
         while(it->next!=NULL){
             if(!strcmp(it->key, key_)){
-                return -2; //key error that identifier already exists
+                return -2; // key error that identifier already exists
             }
             it = it->next;
         }
-        if(!strcmp(it->key, key_)){ //check tail
+
+        //check tail
+        if(!strcmp(it->key, key_)){ 
             return -2;
         }
-        it->next = new Custom_Object(key_, custom); // set to end of list at that index
+
+        // set to end of list at that index
+        it->next = new Custom_Object(key_, custom); 
     }
     else{
-        obj_map[index] = new Custom_Object(key_, custom); // set to end of list at that index
+
+        // first object mapped to that index
+        obj_map[index] = new Custom_Object(key_, custom); 
     }
 
     // allocation failed from not enough space in buffer. Remove from obj_map
-    Node* it2 = obj_map[index];
-    if(!it2->var.success()){
-        it2 = obj_map[index];
-        while(strcmp(it2->next->key, key_)){
-            it2 = it2->next;
+    Node* it2 = find_custom(key_);
+    if(!it2->get_field().success()){
+        Node* it3 = obj_map[index];
+        if(it3 == it2){
+            delete it3;
+            obj_map[index] = NULL;
+            return -4; // jsonBuffer full
         }
-        delete it2->next;
-        it2->next = NULL;
-        return -5;
+        while(it3->next != it2){
+            it3 = it3->next;
+        }
+        delete it2;
+        it3->next = NULL;
+        return -4; // jsonBuffer full
     }
-    return 0;
+    return 0; // success
 }
 
 int Outgoing_Data::create_array(const char* key_, JsonVariant& custom){
     if(!custom.is<JsonObject>() || !custom.success()){
-        // createNestedObject and array test for -3 error at the higher level. This case should only be hit by add_obect() or add_array() if "data" is invalid
+        
+        // "data" created incorrectly, or object in hash table not removed. 
         return -5; 
     }
     int index = hash(key_);
-    if(Node* it = obj_map[index]){ // element already mapped there
+
+    // hash table collision
+    if(Node* it = obj_map[index]){ 
         while(it->next!=NULL){
             if(!strcmp(it->key, key_)){
                 return -2; //key error that identifier already exists
             }
             it = it->next;
         }
+
         // check tail
         if(!strcmp(it->key, key_)){ 
             return -2;
         }
-        it->next = new Custom_Array(key_, custom); // set to end of list at that index
+
+        // set to end of list at that index
+        it->next = new Custom_Array(key_, custom); 
     }
     else{
-        obj_map[index] = new Custom_Array(key_, custom); // set to end of list at that index
+
+        // first object at that index
+        obj_map[index] = new Custom_Array(key_, custom); 
     }
 
     // allocation failed from not enough space in buffer. Remove from obj_map
-    Node* it2 = obj_map[index];
-    if(!it2->var.success()){
-        it2 = obj_map[index];
-        while(strcmp(it2->next->key, key_)){
-            it2 = it2->next;
+    Node* it2 = find_custom(key_);
+    if(!it2->get_field().success()){
+        Node* it3 = obj_map[index];
+        if(it3 == it2){
+            delete it3;
+            obj_map[index] = NULL;
+            return -4; // jsonBuffer full
         }
-        delete it2->next;
-        it2->next = NULL;
-        return -5;
+        while(it3->next != it2){
+            it3 = it3->next;
+        }
+        delete it2;
+        it3->next = NULL;
+        return -4; // jsonBuffer full
     }
     return 0; // success
 }
@@ -123,8 +151,14 @@ int Outgoing_Data::create_nested_object(const char* key_, const char* obj_key){
 }
 
 void Outgoing_Data::clear(){
-    custom_deleter(); // reset hash table
-    jsonBuffer.clear(); // reset jsonBuffer
+
+    // reset hash table
+    custom_deleter(); 
+
+    // reset jsonBuffer
+    jsonBuffer.clear();
+
+    // make outgoing message ready to add new data
     DATAroot = jsonBuffer.createObject();
     create_object("data", DATAroot);
 }

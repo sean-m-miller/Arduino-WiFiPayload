@@ -2,6 +2,8 @@
 #include "Incoming_Data.hpp"
 
 Incoming_Data::Incoming_Data(){
+
+    // clear hash table
     for(size_t i = 0; i < 100; i++){
         obj_map[i] = NULL;
     }
@@ -10,10 +12,14 @@ Incoming_Data::Incoming_Data(){
 void Incoming_Data::create_obj_map(JsonVariant obj){
     for(JsonPair& pair : obj.as<JsonObject>()){
         if(pair.value.is<JsonObject&>()){
+
+            //use Incoming_Data overload
             create_object(pair.key, pair.value.as<JsonObject>());
             create_obj_map(pair.value);
         }
         if(pair.value.is<JsonArray&>()){
+
+            // use Incoming_Data overload
             create_array(pair.key, pair.value.as<JsonArray>());
 
             // update new array's capacity
@@ -26,7 +32,7 @@ void Incoming_Data::create_obj_map(JsonVariant obj){
 int Incoming_Data::create_object(const char* key_, JsonObject& custom){
     int index = hash(key_);
 
-    // element already mapped there
+    // obj_map collision
     if(Node* it = obj_map[index]){ 
         while(it->next!=NULL){
             if(!strcmp(it->key, key_)){
@@ -54,7 +60,7 @@ int Incoming_Data::create_object(const char* key_, JsonObject& custom){
 int Incoming_Data::create_array(const char* key_, JsonArray& custom){
     int index = hash(key_);
 
-    // element already mapped there
+    // obj_map collision
     if(Node* it = obj_map[index]){ 
         while(it->next!=NULL){
             if(!strcmp(it->key, key_)){

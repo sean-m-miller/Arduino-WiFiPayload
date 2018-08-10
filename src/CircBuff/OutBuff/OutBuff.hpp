@@ -11,10 +11,10 @@ class OutBuff : public CircBuff{
     public:
     
         // receives message to be inserted in circ_buf
-        size_t receive_out(char* source_in, size_t size);
+        size_t push_outgoing_message(char* source_in, size_t size);
 
-        // sends all messages
-        size_t send_out(WiFiUDP& udp, const char* udpAddress, const int udpPort);
+        // sends all messages contained in circ_buf
+        size_t send_outgoing_messages(WiFiUDP& udp, const char* udpAddress, const int udpPort);
 
 };
 

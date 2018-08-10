@@ -8,14 +8,17 @@ class InBuff : public CircBuff{
 
     public:
 
-        size_t receive_char(char c);
-
-        size_t send_message(char* destination);
-
+        // function to be called before receive_char()
         size_t start_msg();
 
+        // add a single char c into circ_buf.
+        size_t push_incoming_char(char c);
+
+        // function to be called after receive_char()
         size_t end_msg();
 
+        // pops the next message off of circ_buf, and copies it into destination
+        size_t pop_incoming_message(char* destination);
 };
 
 #endif

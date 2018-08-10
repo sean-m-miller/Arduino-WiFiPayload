@@ -26,11 +26,11 @@ class CircBuff{
 
     protected:
 
-        // array of char pointers to starts of all messages in circ_buf
-        char* starts[values::CIRC_LENGTH/4];
+        // array of char pointers to starts of all messages in circ_buf.
+        char* starts[values::STARTS_ENDS_SIZE];
 
         // array of char pointers to ends of all messages in circ_buf
-        char* ends[values::CIRC_LENGTH/4];
+        char* ends[values::STARTS_ENDS_SIZE];
 
         // indices correlate to a single message in starts and ends.
         // For example, starts[0] returns a pointer to the start of the first message inserted into circ_buf,

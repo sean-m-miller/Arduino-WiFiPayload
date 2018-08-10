@@ -30,6 +30,13 @@
     -4 No message from DDS available to be parsed
     -5 Unintended internal error - please report */
 
+/*  JsonBuffer.size() and jsonBuffer.printTo() both include null terminator
+    All messages to and from the Circular Buffers must be: indices 0 - 3 crc
+                                                           indices 4 - 1026 message
+                                                           index 1027 null trminator */
+
+
+
 class WiFiPayload {
     
     public:
@@ -125,7 +132,7 @@ class WiFiPayload {
             return -4;
         }
 
-        // finds the position index in array named "key_" and captures the value in destination.
+        // finds the position index in array (can be nested) named "key_" and captures the value in destination.
         // Returns 0 on success, -1 if index does not exist, -2 if key_ does not exist.
         // Returns -3 if key_ names an object, and returns -4 if no message available to be parsed.
         template<typename T> int parse_array(const char* key_, size_t index, T& destination){
@@ -205,10 +212,10 @@ class WiFiPayload {
         WiFiUDP udp;
 
         // buffer used temporarily for outgoing messages. + 4 to leave space for crc
-        char write_mes_buf[values::MESSAGE_SIZE + 4];
+        char write_mes_buf[values::MESSAGE_WITH_CRC_SIZE];
 
         // buffer used temporarily for incoming messages. + 4 to leave space for crc
-        char read_mes_buf[values::MESSAGE_SIZE + 4];
+        char read_mes_buf[values::MESSAGE_WITH_CRC_SIZE];
 
         // name for WiFiPayload object. Used as unique identifier for the Trident server connections map
         char device_name[values::NAME_SIZE] = "No_Name";
