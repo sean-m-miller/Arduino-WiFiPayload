@@ -107,6 +107,7 @@ int WiFiPayload::write(){
 
     uint32_t calculated_crc = CRC32.crc32((uint8_t*) &write_mes_buf[4], strlen(&write_mes_buf[4])); // on my machine, char* and uint8_t* are NOT compatible
 
+    // insert into first 4 bytes of write_mes_buf
     write_mes_buf[0] = (calculated_crc >> 3*8) & 255;
     write_mes_buf[1] = (calculated_crc >> 2*8) & 255;
     write_mes_buf[2] = (calculated_crc >> 8) & 255;
@@ -116,67 +117,66 @@ int WiFiPayload::write(){
 
     Serial.println(write_mes_buf);
 
+    // do not use strlen on index zero of write_mes_buf in the event that one of the 4 crc bytes evaluates to null char
     size_t mes_length = (strlen(&write_mes_buf[4]) + 4);
-
-    // for(int i = 0; i < mes_length; i++){
-    //     Serial.println((uint8_t)write_mes_buf[i]);
-    // }
 
     write_buf.receive_out(write_mes_buf, mes_length);
     out_data.clear();
 
-    out_data.DATAroot["msg_type"] = "transmission"; // add to root object, not 
+    out_data.DATAroot["msg_type"] = "transmission";
     out_data.DATAroot["ip"] = WiFi.localIP().toString();
     out_data.DATAroot["device_name"] = device_name;
 
     return 0;
 }
 
-int WiFiPayload::read_into_buf(){ 
+int WiFiPayload::receive_into_read_buf(){ 
 
     // if a packet has been recieved, write it into read_buf
     int packetSize = udp.parsePacket();
     int count = 0;
     if (packetSize){
+
+        // make sure message received is less than maximum message size
         if(read_buf.checkSize(packetSize)){
             read_buf.start_msg();        
             for(size_t i = 0; i < packetSize; i++){
                 read_buf.receive_char(udp.read());
                 count ++;
-            } 
+            }
             read_buf.end_msg();
         }
     }
-    return count;   
+    return count;
 }
 
-int WiFiPayload::read(){ // clears current read message. return size of first message in read_buf, and load into read_mes_buf
+int WiFiPayload::read(){
 
-    in_data.clear(); // with this setup, in_data gets cleared even if no hash table exists. Make clear() virtual, with the Incoming_Data version only clearing if ready = true, and flipping ready to false after. 
+    in_data.clear();
+
+    ready = false; 
     
     Serial.println("VALUE OF extract_message()");
-        
+    
+    // pop message of read_buf and copy to read_mes_buf
     size_t message_size = read_buf.send_message(read_mes_buf);
 
-    if(message_size){ // a message was read
+    // if we copied a message
+    if(message_size){
         
         // extract crc
         uint8_t incoming_crc[4];
-
         for(size_t i = 0; i < 4; i++){
             incoming_crc[i] = read_mes_buf[i];
         }
-
         uint32_t claimed_crc = incoming_crc[0] << 3*8 | incoming_crc[1] << 2*8 | incoming_crc[2] << 8 | incoming_crc[3];
 
         Serial.println("message from DDS:");
-
         Serial.println(strlen(&read_mes_buf[4]));
 
+        // calculate crc
         FastCRC32 CRC32;
-
         uint32_t calculated_crc = CRC32.crc32((uint8_t*)&read_mes_buf[4], strlen(&read_mes_buf[4]));
-
         in_data.DATAroot = in_data.jsonBuffer.parseObject(&read_mes_buf[4], 50);
 
         if(claimed_crc != calculated_crc){
@@ -186,15 +186,13 @@ int WiFiPayload::read(){ // clears current read message. return size of first me
             return -2;
         }
 
-        //Serial.println("before create obj map line 101");
-
-        if(in_data.DATAroot.success()){ // checks for valid JSON
-            ready = true; // set ready true, so that if create_obj_map fails, clear() from the next read() will reset hash table
-            in_data.create_obj_map(in_data.DATAroot); // only want user_generated fields
+        //check for valid json, construct obj_map, and set ready accordingly
+        if(in_data.DATAroot.success()){
+            ready = true;
+            in_data.create_obj_map(in_data.DATAroot["data"]); // only want user generated fields in obj_map, not "ip", "msg_type", etc.
             if(in_data.DATAroot.success()){
-               // Serial.println("line 156");
                 ready = true;
-                return 0; // obj_map and in_data have been successfully created out of incoming message.
+                return 0; // success
             }
             ready = false;
             return -5; // unintended internal error
@@ -203,73 +201,64 @@ int WiFiPayload::read(){ // clears current read message. return size of first me
     return -1;
 }
 
-int WiFiPayload::parse_array_cstring(const char* key_, size_t index, char* destination){ // custom array overload
+int WiFiPayload::parse_array_cstring(const char* key_, size_t index, char* destination){
     if(ready){
         return in_data.parse_array_cstring(key_, index, destination);
     }
     return -4;
 }
 
-int WiFiPayload::parse_object_cstring(const char* key_, const char* index, char* destination){ // custom object overload
+int WiFiPayload::parse_object_cstring(const char* key_, const char* index, char* destination){
     if(ready){
         return in_data.parse_object_cstring(key_, index, destination);
     }
     return -4;
 }
 
-int WiFiPayload::parse_data_cstring(const char* key_, char* destination){ // data field overload
+int WiFiPayload::parse_data_cstring(const char* key_, char* destination){
     if(ready){
         return in_data.parse_data_cstring(key_, destination);
     }
     return -4;
 }
 
-void WiFiPayload::heartbeat(){ // handle all "asynchronous" tasks -> read and send data from circ_buf, send heartbeat every 3 seconds
+void WiFiPayload::heartbeat(){
 
+    // check to see if still connected
     if(myWiFi->status() == WL_CONNECTED){
         connected = true;
 
-        char heart_buf[110]; // largest possible heartbeat message: 192.168.1.143 used 66 bytes, if ip in form WWW.XXX.YYY.ZZZ, would use two more bytes. 
-
-        ///Serial.println("line 147 in heartbeat");
-
-        StaticJsonBuffer<100> tempBuffer; // buffer on stack. Use DynamicJsonBuffer for buffer on heap.
-        JsonObject& temp_root = tempBuffer.createObject(); // initialize root of JSON object. Memory freed when root goes out of scope.
+        //construct heartbeat message
+        char heart_buf[110]; 
+        StaticJsonBuffer<100> tempBuffer;
+        JsonObject& temp_root = tempBuffer.createObject();
         temp_root.set<String>("msg_type", "heartbeat");
         temp_root.set<String>("ip", WiFi.localIP().toString());
         temp_root.set<String>("device_name", device_name);
-
-       // Serial.println("line 155 in heartbeat");
-
         temp_root.printTo(heart_buf);
 
+        // calculate crc and add to first 4 bytes of heart_buf
         FastCRC32 CRC32;
-
         uint32_t calculated_crc = CRC32.crc32((uint8_t*) heart_buf, strlen(heart_buf));
-
         heart_buf[0] = (calculated_crc >> 3*8) & 255;
         heart_buf[1] = (calculated_crc >> 2*8) & 255;
         heart_buf[2] = (calculated_crc >> 8) & 255;
         heart_buf[3] = calculated_crc & 255;
 
-        //Serial.println("line 161 in heartbeat");
-
-        temp_root.printTo(&heart_buf[4], tempBuffer.size()); // convert from JSON object to c string
-
-        // for(int i = 0; i < tempBuffer.size() + 4; i++){
-        //     Serial.println((uint8_t)heart_buf[i]);
-        // }
+        // copy object back into heartbeat, overwriting the previous copy (offset by 4 from crc)
+        temp_root.printTo(&heart_buf[4], tempBuffer.size()); 
 
         Serial.println("HEARTBEAT BEING SENT TO DDS");
-
         Serial.println(heart_buf);
 
-        //write to circ_buf
+        // write to write_buf
         write_buf.receive_out(heart_buf, tempBuffer.size() + 4); // no null characters in this message ever besides the terminating one hopefully
         
+        // send all messages that have been added to write_buf
         write_buf.send_out(udp, udpAddress, udpPort);
 
-        read_into_buf();
+        // if messages sent from DDS, write them into read_buf
+        receive_into_read_buf();
     }
     else{
         connected = false;

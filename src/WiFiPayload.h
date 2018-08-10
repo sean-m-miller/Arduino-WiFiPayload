@@ -97,7 +97,7 @@ class WiFiPayload {
             return out_data.add_to_array(key_, index, t);
         }
 
-        // sends outgoing message DDS via write_buf and clears the outgoing message. 
+        // sends outgoing message to DDS via write_buf and clears the outgoing message. 
         // Returns -1 and does not write (still clears outgoing message) if device_name was never set.
         int write();
 
@@ -184,7 +184,7 @@ class WiFiPayload {
         InBuff read_buf;
 
         // called in heartbeat(), checks if udp packet available, and copies into read_buf
-        int read_into_buf();
+        int receive_into_read_buf();
 
         // ssid
         char networkName[values::NAME_SIZE];
@@ -204,14 +204,14 @@ class WiFiPayload {
         // udp object
         WiFiUDP udp;
 
-        // buffer used temporarily for outgoing messages
-        char write_mes_buf[values::MESSAGE_SIZE];
+        // buffer used temporarily for outgoing messages. + 4 to leave space for crc
+        char write_mes_buf[values::MESSAGE_SIZE + 4];
 
-        // buffer used temporarily for incoming messages
-        char read_mes_buf[values::MESSAGE_SIZE];
+        // buffer used temporarily for incoming messages. + 4 to leave space for crc
+        char read_mes_buf[values::MESSAGE_SIZE + 4];
 
         // name for WiFiPayload object. Used as unique identifier for the Trident server connections map
-        char device_name[30] = "No_Name";
+        char device_name[values::NAME_SIZE] = "No_Name";
 };
 
 

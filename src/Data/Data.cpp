@@ -6,7 +6,6 @@ size_t Data::msg_size(){
 }
 
 Data::Node::Node(const char* key_, JsonVariant var_) : var(var_){
-    memset(key, '\0', sizeof(key));
     strcpy(key, key_);
 }
 
@@ -15,25 +14,21 @@ JsonVariant& Data::Node::get_field(){
 }
 
 Data::Custom_Object::Custom_Object(const char* key_, JsonVariant& root_) : obj(root_.as<JsonObject&>().createNestedObject(key_)) {
-    memset(key, '\0', sizeof(key));
     strcpy(key, key_);
     var = obj;
 }
 
-Data::Custom_Object::Custom_Object(const char* key_, JsonObject& root_) : obj(root_){ // used in create_obj_table to preserve JsonObject
-    memset(key, '\0', sizeof(key));
+Data::Custom_Object::Custom_Object(const char* key_, JsonObject& root_) : obj(root_){
     strcpy(key, key_);
     var = obj;
 }
 
 Data::Custom_Array::Custom_Array(const char* key_, JsonVariant& root_) : arr(root_.as<JsonObject&>().createNestedArray(key_)) {
-    memset(key, '\0', sizeof(key));
     strcpy(key, key_);
     var = arr;
 }
 
 Data::Custom_Array::Custom_Array(const char* key_, JsonArray& root_) : arr(root_){
-    memset(key, '\0', sizeof(key));
     strcpy(key, key_);
     var = arr;
 }
@@ -46,11 +41,15 @@ Data::Node* Data::find_custom(const char* key_){
             }
             it = it->next;
         }
-        return NULL; // key not found
     }
+    return NULL; // key not found
 }
 
-int Data::hash(const char* key_){ // bad polynomial hash function
+
+int Data::hash(const char* key_){ 
+
+    // bad polynomial hash function, but it works for now
+
     int sum = 0;
     bool flag = true;
     for(size_t i = 0; i < strlen(key_); i++){
