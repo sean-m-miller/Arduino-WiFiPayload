@@ -1,9 +1,11 @@
 #ifndef Data_hpp
 #define Data_hpp
 
+
+#include "../Values.hpp" // for values namespace
 #include "Arduino.h"
 #include <ArduinoJson.h>
-#include "../Values.hpp" // for values namespace
+
 
 // wrapper around the ArduinoJson library
 class Data{
@@ -17,7 +19,7 @@ class Data{
         void print_hash_table();
 
         // Buffer for storing Json objects
-        StaticJsonBuffer<values::MESSAGE_SIZE> jsonBuffer; 
+        StaticJsonBuffer<values::MESSAGE_SIZE> jsonBuffer;
 
         // "root" of the data object. 
         JsonVariant DATAroot;
