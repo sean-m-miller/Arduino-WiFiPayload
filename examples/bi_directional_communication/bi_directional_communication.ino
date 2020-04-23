@@ -1,12 +1,10 @@
-// Trident WiFiPayload
-// OpenROV 2018
 
 // This example shows how one could setup bi-directional communication from the Android device on the surface to an Arduino-interfaced device and vice-versa.
 // for this example, we will be using a fictional gripper arm
 
 #include <WiFiPayload.h> // include header file. WiFiPayload folder must be stored in Arduino/libraries/
 
-// WiFiPayload constructor (WiFi network name, WiFi network password, Trident's listening ip in string form, Trident's listening port as unsigned int).
+// WiFiPayload constructor (WiFi network name, WiFi network password, server's listening ip in string form, server's listening port as unsigned int).
 WiFiPayload payload("ssid", "pswd", "10.10.10.10", 12345);
 
 void setup() {
@@ -14,7 +12,7 @@ void setup() {
   // connects WiFiPayload to WiFi network, and prepares the outgoing and incoming message objects to accept data.
   payload.begin();
 
-  // client identifier. If multiple payloads running on one trident, device names must be unique.
+  // client identifier. If multiple payloads running on one server, device names must be unique.
   payload.set_device_name("metal_detector");
 
 }
@@ -28,7 +26,7 @@ void setup() {
 
 void loop() {
 
-  // manages the connection to trident and performs all network communication. 
+  // manages the connection to server and performs all network communication. 
   // Always place before read() and write() functions (first function in loop() is best), and do not have other blocking functions inside the loop body
   payload.heartbeat();
 
@@ -59,16 +57,16 @@ void loop() {
       
     }
 
-    // creates an object to store our metal detection data in the outgoing message object
+    // creates an object to store our gripper arm data in the outgoing message object
     payload.add_object("gripper_arm_status");
 
-    // take a metal detector reading
+    // take a gripper arm status reading
     int current_status = gripper_arm_status();
 
     // add a key ("reading 1") value (salinity) pair to the object called "salinity_data".
     payload.add_to_object("gripper_arm_status", "status", current_status);
 
-    // write the outgoing message object to the Android device via Trident. 
+    // write the outgoing message object to the Android device via server. 
     // This call clears the outgoing message.
     payload.write();
 

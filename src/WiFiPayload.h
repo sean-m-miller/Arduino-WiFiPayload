@@ -62,7 +62,7 @@ class WiFiPayload {
         // set myWiFi to the externed WiFi object and connect to wifi. returns 0 on success, -1 if device_name has not been set
         int begin(); 
 
-        // getter function to see if WiFiPayload is connected to Trident WiFi
+        // getter function to see if WiFiPayload is connected to server access point
         bool is_connected();
     
         // adds a key (key_) value (t) pair to the outgoing data message. relies on implicit casts, overwrites if key_ already exists. 
@@ -158,7 +158,7 @@ class WiFiPayload {
         // Returns -3 if key_ names an object and -4 if no message available to be parsed.
         int parse_array_cstring(const char* key_, size_t index, char* destination);
 
-        // performs various updates and signals to Trident that this device is connected and active
+        // performs various updates and signals to server that this device is connected and active
         void heartbeat();
 
         // copies the outgoing message to destination
@@ -199,10 +199,10 @@ class WiFiPayload {
         // pswd
         char networkPswd[values::NAME_SIZE];
 
-        // ip address of Trident
+        // ip address of server
         char udpAddress[values::NAME_SIZE];
 
-        // port Trident is lsitening on
+        // port server is lsitening on
         unsigned int udpPort;
 
         // class pointer to extern WiFiClass object
@@ -217,7 +217,7 @@ class WiFiPayload {
         // buffer used temporarily for incoming messages. + 4 to leave space for crc
         char read_mes_buf[values::MESSAGE_WITH_CRC_SIZE];
 
-        // name for WiFiPayload object. Used as unique identifier for the Trident server connections map
+        // name for WiFiPayload object. Used as unique identifier for the server connections map
         char device_name[values::NAME_SIZE] = "No_Name";
 };
 
